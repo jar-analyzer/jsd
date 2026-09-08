@@ -1,0 +1,50 @@
+name: test-roundtrip
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  roundtrip:
+    name: Round-trip / JDK ${{ matrix.java }} / ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { java: '8', mode: debug, args: '' }
+          - { java: '11', mode: debug, args: '' }
+          - { java: '17', mode: debug, args: '' }
+          - { java: '21', mode: debug, args: '' }
+          - { java: '25', mode: debug, args: '' }
+          - { java: '8', mode: no-debug, args: '--no-debug' }
+          - { java: '17', mode: no-debug, args: '--no-debug' }
+          - { java: '25', mode: no-debug, args: '--no-debug' }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '${{ matrix.java }}'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:roundtrip -- ${{ matrix.args }}
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: roundtrip-${{ matrix.java }}-${{ matrix.mode }}
+          path: /tmp/jsd-e2e-*
+          if-no-files-found: ignore
+          retention-days: 7

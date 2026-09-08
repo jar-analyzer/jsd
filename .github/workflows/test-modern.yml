@@ -1,7 +1,9 @@
-name: modern
+name: test-modern
 
 on:
   push:
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,16 +14,13 @@ concurrency:
 
 jobs:
   modern:
+    name: Modern Java / JDK ${{ matrix.java }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - java: '21'
-            scope: '--max-release=21'
-          - java: '25'
-            scope: ''
+        java: ['21', '25']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -34,12 +33,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: node test/run-modern.mjs --require-all ${{ matrix.scope }}
-      - run: node test/run-modern.mjs --require-all ${{ matrix.scope }} --no-debug
+      - run: node test/roundtrip/modern.mjs --require-all --max-release=${{ matrix.java }}
+      - run: node test/roundtrip/modern.mjs --require-all --max-release=${{ matrix.java }} --no-debug
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: modern-${{ strategy.job-index }}
+          name: modern-${{ matrix.java }}
           path: /tmp/jsd-modern-e2e-*
           if-no-files-found: ignore
           retention-days: 7

@@ -1,7 +1,7 @@
 node_modules/
 dist/
 docs/jsd.browser.js
-test/fixtures-modern/ModernJdk25.java
+test/roundtrip/fixtures/modern/java25/CompactSourceFile.java
 package-lock.json
 coverage/
 .nyc_output/

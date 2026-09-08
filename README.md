@@ -1,11 +1,12 @@
 # jsd
 
-[![Round-trip](https://github.com/jar-analyzer/jsd/actions/workflows/test.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test.yml)
-[![No debug info](https://github.com/jar-analyzer/jsd/actions/workflows/test-nodebug.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-nodebug.yml)
+[![Quality](https://github.com/jar-analyzer/jsd/actions/workflows/test-quality.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-quality.yml)
+[![Unit](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml)
+[![Round-trip](https://github.com/jar-analyzer/jsd/actions/workflows/test-roundtrip.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-roundtrip.yml)
 [![Modern Java](https://github.com/jar-analyzer/jsd/actions/workflows/test-modern.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-modern.yml)
-[![Unit tests](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml)
-[![Package consumer](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml)
-[![Fuzz](https://github.com/jar-analyzer/jsd/actions/workflows/fuzz.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/fuzz.yml)
+[![Bytecode](https://github.com/jar-analyzer/jsd/actions/workflows/test-bytecode.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-bytecode.yml)
+[![Package](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml)
+[![Fuzz](https://github.com/jar-analyzer/jsd/actions/workflows/test-fuzz.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-fuzz.yml)
 
 **[English](./README.md)** | [简体中文](./README.zh-CN.md)
 
@@ -72,18 +73,19 @@ For batches, use `maxTotalInputBytes` to limit the total loaded size and `maxCla
 
 ## Testing
 
-Counts reflect the current test suite. Modern Java and dynamic bytecode cases are selected by JDK version. Round-trip tests compile and run both the original and recovered Java, then compare their output.
+`npm test` runs the build, unit, core round-trip and bytecode suites (JDK 11+). `npm run test:all` also runs quality checks, both Java debug modes, modern Java, package and fuzz tests (JDK 25+). Each run builds the library at most once.
 
-| Test suite       | Cases / rounds | Coverage                                                                                                           | CI environment        |
-| ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| Unit             | 216            | Parsing, type inference, resource limits, diagnostics and Demo behavior; formatting and browser bundle consistency | Node.js 24            |
-| Round-trip       | 138            | Evaluation order, switch fallthrough, exception cleanup and resource management                                    | JDK 8, 11, 17, 21, 25 |
-| No debug info    | 138            | The same round-trip suite compiled without debug information                                                       | JDK 8, 17, 25         |
-| Modern Java      | Up to 14       | Java 9–25 syntax, including records, sealed types and pattern matching; with and without debug information         | JDK 21, 25            |
-| Dynamic bytecode | Up to 37       | Runtime behavior of dynamic constants, string concatenation and dynamic switches                                   | JDK 11, 17, 21, 25    |
-| JVM validation   | 17             | Malformed StackMap frames, exception tables and instruction operands; compare rejection with the JVM               | JDK 11, 17, 21, 25    |
-| Package consumer | —              | Packed-package installation, TypeScript declarations, ESM imports, public APIs and license inclusion               | Node.js 20, 24        |
-| Fuzz             | 2,000 rounds   | Fixed-seed bytecode mutations; monitor crashes and timeouts                                                        | Node.js 24, JDK 25    |
+| Suite            | Command                                  | Coverage                                                                                                               | CI environment                               |
+| ---------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Quality          | `npm run format:check` / `npm run check` | Formatting, TypeScript checks and browser bundle consistency in CI                                                     | Node.js 24                                   |
+| Unit             | `npm run test:unit`                      | 216 engine and demo cases: parsing, types, diagnostics, resource limits and UI state                                   | Node.js 24                                   |
+| Java round-trip  | `npm run test:roundtrip`                 | 138 cases covering evaluation order, control flow, exceptions and resources; `-- --no-debug` removes debug information | JDK 8, 11, 17, 21, 25; no-debug on 8, 17, 25 |
+| Modern Java      | `npm run test:modern`                    | Up to 14 Java 9–25 cases, with and without debug information                                                           | JDK 21, 25                                   |
+| Bytecode         | `npm run test:bytecode`                  | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks                                                      | JDK 11, 17, 21, 25                           |
+| Package consumer | `npm run test:package`                   | Local package installation, TypeScript declarations, ESM imports, public APIs and license                              | Node.js 20, 24                               |
+| Fuzz             | `npm run test:fuzz`                      | 2,000 deterministic mutations per run, with an isolated corpus and worker                                              | Node.js 24, JDK 25                           |
+
+Counts reflect the current suite; applicable Java cases depend on the JDK version. Each CI category has its own workflow, triggered independently on pushes and pull requests. Workflows can run concurrently, subject to available runners.
 
 ## License
 

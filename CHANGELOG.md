@@ -1,6 +1,8 @@
 # CHANGELOG
 
-## 1.0.4 dev
+## 1.1.0 dev
+
+release date:
 
 - Improve dynamic bytecode support.
 - Improve lambda and method reference recovery.
@@ -17,7 +19,10 @@
 - Enforce configurable resource limits.
 - Refine the demo.
 - Expand regression coverage.
+- Organize test suites, fixture names and independent CI workflows.
 
-## 1.0.3 2026.09.08
+## 1.0.3
+
+release date: 2026.09.08
 
 - first version

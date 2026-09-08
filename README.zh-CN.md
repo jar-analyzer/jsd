@@ -1,11 +1,12 @@
 # jsd
 
-[![Round-trip](https://github.com/jar-analyzer/jsd/actions/workflows/test.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test.yml)
-[![No debug info](https://github.com/jar-analyzer/jsd/actions/workflows/test-nodebug.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-nodebug.yml)
+[![Quality](https://github.com/jar-analyzer/jsd/actions/workflows/test-quality.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-quality.yml)
+[![Unit](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml)
+[![Round-trip](https://github.com/jar-analyzer/jsd/actions/workflows/test-roundtrip.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-roundtrip.yml)
 [![Modern Java](https://github.com/jar-analyzer/jsd/actions/workflows/test-modern.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-modern.yml)
-[![Unit tests](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-unit.yml)
-[![Package consumer](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml)
-[![Fuzz](https://github.com/jar-analyzer/jsd/actions/workflows/fuzz.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/fuzz.yml)
+[![Bytecode](https://github.com/jar-analyzer/jsd/actions/workflows/test-bytecode.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-bytecode.yml)
+[![Package](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-package.yml)
+[![Fuzz](https://github.com/jar-analyzer/jsd/actions/workflows/test-fuzz.yml/badge.svg)](https://github.com/jar-analyzer/jsd/actions/workflows/test-fuzz.yml)
 
 [English](./README.md) | **[简体中文](./README.zh-CN.md)**
 
@@ -72,18 +73,19 @@ const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
 
 ## 测试
 
-数量按当前测试集统计，现代 Java 和动态字节码用例根据 JDK 版本选择。往返测试会编译并执行原始与恢复的 Java 源码，再对比输出。
+`npm test` 执行构建、单元测试、普通 Java 往返和字节码测试（JDK 11+）。`npm run test:all` 还会执行质量检查、有无调试信息两种模式、现代 Java、安装包和模糊测试（JDK 25+）。每次运行最多构建一次库。
 
-| 测试套件     | 用例 / 轮次 | 覆盖内容                                                              | CI 环境               |
-| ------------ | ----------- | --------------------------------------------------------------------- | --------------------- |
-| 单元测试     | 216         | 解析、类型推断、资源限额、诊断与 Demo 行为；格式及浏览器产物一致性    | Node.js 24            |
-| 往返测试     | 138         | 求值顺序、switch 贯穿、异常清理与资源管理                             | JDK 8、11、17、21、25 |
-| 无调试信息   | 138         | 同一套往返用例，编译时去除调试信息                                    | JDK 8、17、25         |
-| 现代 Java    | 最多 14     | record、sealed、模式匹配等 Java 9–25 语法，覆盖有、无调试信息两种模式 | JDK 21、25            |
-| 动态字节码   | 最多 37     | 动态常量、字符串拼接与动态 switch 的运行行为                          | JDK 11、17、21、25    |
-| JVM 对照校验 | 17          | 畸形 StackMap 帧、异常表与指令操作数，对照 JVM 的拒绝结果             | JDK 11、17、21、25    |
-| 安装包测试   | —           | 安装打包产物，检查 TypeScript 声明、ESM 导入、公开 API 和许可证       | Node.js 20、24        |
-| 模糊测试     | 2,000 轮    | 固定种子的字节码变异，监测崩溃及超时                                  | Node.js 24、JDK 25    |
+| 测试分类  | 命令                                     | 覆盖内容                                                                          | CI 环境                                       |
+| --------- | ---------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------- |
+| 质量检查  | `npm run format:check` / `npm run check` | 格式、TypeScript 检查及 CI 中的浏览器产物一致性                                   | Node.js 24                                    |
+| 单元测试  | `npm run test:unit`                      | 216 个引擎与 Demo 用例，覆盖解析、类型、诊断、资源限额和界面状态                  | Node.js 24                                    |
+| Java 往返 | `npm run test:roundtrip`                 | 138 个用例，覆盖求值顺序、控制流、异常和资源管理；加 `-- --no-debug` 去除调试信息 | JDK 8、11、17、21、25；无调试信息为 8、17、25 |
+| 现代 Java | `npm run test:modern`                    | 最多 14 个 Java 9–25 用例，覆盖有、无调试信息两种模式                             | JDK 21、25                                    |
+| 字节码    | `npm run test:bytecode`                  | 最多 37 个动态字节码用例及 17 个畸形 class 的 JVM 对照校验                        | JDK 11、17、21、25                            |
+| 安装包    | `npm run test:package`                   | 本地安装打包产物，检查 TypeScript 声明、ESM 导入、公开 API 和许可证               | Node.js 20、24                                |
+| 模糊测试  | `npm run test:fuzz`                      | 每次 2,000 轮固定种子变异，使用独立语料目录和 Worker                              | Node.js 24、JDK 25                            |
+
+数量按当前测试集统计，适用的 Java 用例取决于 JDK 版本。每类 CI 使用独立工作流，推送代码或创建、更新 PR 时分别触发，可在可用 Runner 额度内并发执行。
 
 ## 许可证
 
