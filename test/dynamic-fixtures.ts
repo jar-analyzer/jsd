@@ -117,7 +117,7 @@ export function dynamicFixtures() {
       bytes: b.build([...ldc(value), 0xb0], `()${descriptor}`),
       minJava: 12,
       expected:
-        name === 'DynamicClassDesc' ? 'ClassDesc[Thread$State]' : 'EnumDesc[Thread$State.NEW]',
+        name === 'DynamicClassDesc' ? 'Ljava/lang/Thread$State;' : 'Ljava/lang/Thread$State;:NEW',
     });
   }
   for (const [name, descriptor, field, declaring, expected] of [

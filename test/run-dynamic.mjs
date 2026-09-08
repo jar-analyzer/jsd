@@ -40,7 +40,25 @@ if (major < 11) {
     const harness = join(work, 'RunDynamic.java');
     writeFileSync(
       harness,
-      'public class RunDynamic { public static void main(String[] args) throws Exception { Object value = Class.forName(args[0]).getMethod("value").invoke(null); if (value instanceof java.util.function.Supplier) value = ((java.util.function.Supplier<?>) value).get(); System.out.print(String.valueOf(value)); } }',
+      `public class RunDynamic {
+        public static void main(String[] args) throws Exception {
+          Object value = Class.forName(args[0]).getMethod("value").invoke(null);
+          if (value instanceof java.util.function.Supplier)
+            value = ((java.util.function.Supplier<?>) value).get();
+          ${
+            major >= 12
+              ? `// Compare descriptor contents, not JDK-specific toString() formatting.
+          if (value instanceof java.lang.constant.ClassDesc)
+            value = ((java.lang.constant.ClassDesc) value).descriptorString();
+          else if (value instanceof Enum.EnumDesc) {
+            Enum.EnumDesc<?> desc = (Enum.EnumDesc<?>) value;
+            value = desc.constantType().descriptorString() + ":" + desc.constantName();
+          }`
+              : ''
+          }
+          System.out.print(String.valueOf(value));
+        }
+      }`,
     );
     for (const dir of [original, recovered]) run('javac', ['-d', dir, harness]);
     const cases = dynamicFixtures().filter((fixture) => (fixture.minJava ?? 11) <= major);
