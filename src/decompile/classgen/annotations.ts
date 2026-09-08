@@ -28,7 +28,8 @@ export function annValStr(
     case 'class': {
       let t: JType;
       try {
-        t = parseFieldDescriptor(v.className);
+        t =
+          v.className === 'V' ? { kind: 'prim', name: 'void' } : parseFieldDescriptor(v.className);
       } catch {
         t = { kind: 'class', name: 'java/lang/Object' };
       }

@@ -1,10 +1,10 @@
 import { errorMessage } from '../diagnostics.js';
-import { ClassFile, MethodInfo } from '../../classfile/model.js';
-import { JType, parseFieldDescriptor } from '../../classfile/types.js';
-import { decodeBytecode } from '../../bytecode/decode.js';
+import { Acc, ClassFile, MethodInfo } from '../../classfile/model.js';
+import { JType, parseFieldDescriptor, parseMethodDescriptor } from '../../classfile/types.js';
+import { Stmt, walkStmt } from '../../ast/ast.js';
 import { resolveLambda } from '../lambdas.js';
 import { decompileMethod } from '../method.js';
-import { RenderCtx, renderStmtsHeader, typeStr } from '../printer/index.js';
+import { RenderCtx, renderStmts, renderStmtsHeader, typeStr } from '../printer/index.js';
 import { buildMethodSig, ctorHasOuterParam, safeSig } from './methodsig.js';
 import type { ClassGenerator } from './index.js';
 
@@ -21,19 +21,140 @@ export const anonPart: ThisType<ClassGenerator> &
       if (superInternal === 'java/lang/Object' && cf.interfaces.length > 0)
         superInternal = cf.interfaces[0];
       const ctor = cf.methods.find((mm) => mm.name === '<init>');
+      if (!ctor && cf.access & Acc.Synthetic) continue;
       const dropFirstArg = ctor ? ctorHasOuterParam(cf, ctor) : false;
       const lines: string[] = [];
+      const captureFields: { name: string; displayName: string; index: number; type: JType }[] = [];
+      const superArgIndices: number[] = [];
+      const ctorBody = ctor ? decompileMethod(this.ctx, cf, ctor) : null;
+      const slots = new Map<number, number>();
+      let slot = 1;
+      for (const [index, type] of (ctor
+        ? parseMethodDescriptor(ctor.descriptor).params
+        : []
+      ).entries()) {
+        slots.set(slot, index);
+        slot += type.kind === 'prim' && ['long', 'double'].includes(type.name) ? 2 : 1;
+      }
+      const initializers: Stmt[] = [];
+      if (!ctorBody || ctorBody.failed)
+        throw new Error(`Anonymous constructor could not be restored: ${cf.name}`);
+      for (const stmt of ctorBody.stmts) {
+        if (stmt.kind === 'return' && !stmt.expr) continue;
+        if (stmt.kind === 'expr') {
+          const expr = stmt.expr;
+          if (expr.kind === 'invoke' && expr.name === '<init>' && expr.superCall) {
+            for (const arg of expr.args) {
+              if (arg.kind !== 'local' || !slots.has(arg.slot))
+                throw new Error(`Unsupported anonymous superclass argument: ${cf.name}`);
+              superArgIndices.push(slots.get(arg.slot)!);
+            }
+            continue;
+          }
+          if (
+            expr.kind === 'assign-expr' &&
+            expr.target.kind === 'field' &&
+            expr.target.owner === cf.name &&
+            expr.target.target?.kind === 'this'
+          ) {
+            const target = expr.target;
+            const field = cf.fields.find((f) => f.name === target.name);
+            if (
+              field &&
+              (field.synthetic || field.access & Acc.Synthetic) &&
+              expr.expr.kind === 'local' &&
+              slots.has(expr.expr.slot)
+            ) {
+              if (!field.name.startsWith('this$'))
+                captureFields.push({
+                  name: field.name,
+                  displayName: '',
+                  index: slots.get(expr.expr.slot)!,
+                  type: parseFieldDescriptor(field.descriptor),
+                });
+              continue;
+            }
+          }
+        }
+        initializers.push(stmt);
+      }
+      const fieldNames = new Map<string, string>();
+      const usedNames = new Set(cf.fields.map((f) => f.name));
+      for (const capture of captureFields) {
+        let displayName = '$capture' + capture.index;
+        while (usedNames.has(displayName)) displayName += '$';
+        usedNames.add(displayName);
+        capture.displayName = displayName;
+        fieldNames.set(cf.name + '#' + capture.name, displayName);
+      }
       for (const f of cf.fields) {
-        if (f.synthetic || /^this\$\d+$/.test(f.name)) continue;
-        const t = f.signature
-          ? (safeSig(f.signature) as never)
-          : parseFieldDescriptor(f.descriptor);
-        lines.push('');
+        if (
+          captureFields.some((capture) => capture.name === f.name) ||
+          f.synthetic ||
+          f.access & Acc.Synthetic
+        )
+          continue;
+        const t = f.signature ? safeSig(f.signature) : null;
+        const mods = [
+          [Acc.Public, 'public'],
+          [Acc.Private, 'private'],
+          [Acc.Protected, 'protected'],
+          [Acc.Static, 'static'],
+          [Acc.Final, 'final'],
+          [Acc.Volatile, 'volatile'],
+          [Acc.Transient, 'transient'],
+        ] as const;
+        const prefix = mods
+          .filter(([flag]) => f.access & flag)
+          .map(([, text]) => text)
+          .join(' ');
+        const constant = f.access & Acc.Static && f.constantValue ? this.constValueStr(f) : null;
         lines.push(
-          `    private ${typeStr((t as JType) ?? parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name};`,
+          '',
+          `    ${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
         );
       }
+      if (initializers.length && ctor) {
+        const rc = this.methodRenderCtxFor(cf, ctor);
+        rc.fieldNames = fieldNames;
+        const labels = new Set<string>();
+        let hasReturn = false;
+        for (const stmt of initializers)
+          walkStmt(stmt, (node) => {
+            if ('label' in node && node.label) labels.add(node.label);
+            if (node.kind === 'return') hasReturn = true;
+          });
+        let label = 'initialize';
+        while (labels.has(label)) label += '$';
+        if (hasReturn) {
+          for (const stmt of initializers)
+            walkStmt(stmt, (node) => {
+              if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
+            });
+          lines.push(
+            '',
+            '    {',
+            `        ${label}: {`,
+            ...renderStmts(initializers, rc, 3),
+            '        }',
+            '    }',
+          );
+        } else lines.push('', '    {', ...renderStmts(initializers, rc, 2), '    }');
+      }
       for (const mm of cf.methods) {
+        if (mm.name === '<clinit>') {
+          const body = decompileMethod(this.ctx, cf, mm);
+          if (body?.failed) throw new Error(body.failed);
+          const stmts = body?.stmts.filter((s) => s.kind !== 'return') ?? [];
+          if (stmts.length)
+            lines.push(
+              '',
+              '    static {',
+              ...renderStmts(stmts, this.methodRenderCtxFor(cf, mm), 2),
+              '    }',
+            );
+          continue;
+        }
         if (mm.name === '<init>' || mm.synthetic || (mm.access & 0x0040) !== 0) continue;
         if (
           (mm.access & 0x1000) !== 0 &&
@@ -43,6 +164,7 @@ export const anonPart: ThisType<ClassGenerator> &
         const body = decompileMethod(this.ctx, cf, mm);
         if (!body || body.failed) continue;
         const mrc = this.methodRenderCtxFor(cf, mm);
+        mrc.fieldNames = fieldNames;
         mrc.scopes.push(new Map());
         try {
           const header = this.methodHeaderFor(cf, mm, mrc);
@@ -60,51 +182,11 @@ export const anonPart: ThisType<ClassGenerator> &
           });
         }
       }
-      const superCls = this.ctx.lookup(superInternal);
-      const noCtorArgs =
-        superInternal !== cf.superName &&
-        (superCls
-          ? (superCls.access & 0x0200) !== 0
-          : superInternal.startsWith('java/')
-            ? false
-            : true);
-      const captureFields: { name: string; slot: number }[] = [];
-      if (noCtorArgs && ctor?.code) {
-        try {
-          const ins = decodeBytecode(ctor.code.code);
-          for (let i = 2; i < ins.length; i++) {
-            const a = ins[i - 2],
-              b = ins[i - 1],
-              c = ins[i];
-            if (a.name !== 'aload_0' || c.name !== 'putfield' || c.cpIndex === undefined) continue;
-            let resolved: string | null = null;
-            try {
-              resolved = cf.cp.memberRef(c.cpIndex).name;
-            } catch {
-              resolved = null;
-            }
-            if (!resolved || !resolved.startsWith('val$')) continue;
-            let slotNum = -1;
-            const loadName = b.name;
-            if (
-              loadName === 'iload' ||
-              loadName === 'aload' ||
-              loadName === 'lload' ||
-              loadName === 'fload' ||
-              loadName === 'dload'
-            )
-              slotNum = b.local ?? -1;
-            else if (/^(i|a|l|f|d)load_\d$/.test(loadName)) slotNum = Number(loadName.slice(-1));
-            if (slotNum < 2) continue;
-            captureFields.push({ name: resolved, slot: slotNum });
-          }
-        } catch {}
-      }
       this.anonClasses.set(name, {
         superInternal,
         dropFirstArg,
-        noCtorArgs,
         captureFields,
+        superArgIndices,
         memberLines: lines,
       });
     }

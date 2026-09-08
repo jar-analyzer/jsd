@@ -59,6 +59,11 @@ if (major < 11) {
       harness,
       `public class RunDynamic {
         public static void main(String[] args) throws Exception {
+          if (args.length > 1 && args[1].equals("booleans")) {
+            java.lang.reflect.Method method = Class.forName(args[0]).getMethod("value", boolean.class);
+            System.out.print(method.invoke(null, false) + ":" + method.invoke(null, true));
+            return;
+          }
           java.lang.reflect.Method method = Class.forName(args[0]).getMethod("value");
           if (args.length > 1 && args[1].equals("concat")) {
             Object first = method.invoke(null);

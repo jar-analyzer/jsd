@@ -36,16 +36,27 @@ export class ExprStack {
   get depth(): number {
     return this.items.length;
   }
+  private requireShape(...shapes: boolean[][]): void {
+    if (
+      !shapes.some((shape) =>
+        shape.every((wide, i) => this.items[this.items.length - 1 - i]?.w === wide),
+      )
+    )
+      throw new SimFail('invalid operand stack category for stack instruction');
+  }
   dup(): void {
+    this.requireShape([false]);
     const t = this.popSE();
     this.items.push(t, { e: t.e, w: t.w });
   }
   dupX1(): void {
+    this.requireShape([false, false]);
     const v1 = this.popSE(),
       v2 = this.popSE();
     this.items.push({ e: v1.e, w: v1.w }, v2, v1);
   }
   dupX2(): void {
+    this.requireShape([false, true], [false, false, false]);
     const v1 = this.popSE(),
       v2 = this.popSE();
     if (v2.w) this.items.push({ ...v1 }, v2, v1);
@@ -55,9 +66,10 @@ export class ExprStack {
     }
   }
   dup2(): void {
+    this.requireShape([true], [false, false]);
     const t = this.peek();
     if (t.w) {
-      this.dup();
+      this.items.push({ ...t });
     } else {
       const n = this.items.length;
       const a = this.items[n - 2],
@@ -66,9 +78,12 @@ export class ExprStack {
     }
   }
   dup2X1(): void {
+    this.requireShape([true, false], [false, false, false]);
     const t = this.peek();
     if (t.w) {
-      this.dupX1();
+      const v1 = this.popSE(),
+        v2 = this.popSE();
+      this.items.push({ ...v1 }, v2, v1);
     } else {
       const n = this.items.length;
       const v1 = this.items[n - 1],
@@ -79,6 +94,12 @@ export class ExprStack {
     }
   }
   dup2X2(): void {
+    this.requireShape(
+      [true, true],
+      [true, false, false],
+      [false, false, true],
+      [false, false, false, false],
+    );
     const v1 = this.popSE();
     const top = v1.w ? [v1] : [this.popSE(), v1];
     const v2 = this.popSE();
@@ -86,6 +107,7 @@ export class ExprStack {
     this.items.push(...top.map((v) => ({ ...v })), ...below, ...top);
   }
   swap(): void {
+    this.requireShape([false, false]);
     const v1 = this.popSE(),
       v2 = this.popSE();
     this.items.push(v1, v2);

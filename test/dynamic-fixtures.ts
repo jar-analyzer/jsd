@@ -7,8 +7,24 @@ export function dynamicFixtures() {
     bytes: Uint8Array;
     expected: string;
     minJava?: number;
-    mode?: 'identity' | 'error' | 'concat' | 'concat-error';
+    mode?: 'identity' | 'error' | 'concat' | 'concat-error' | 'booleans';
   }[] = [];
+  for (const [suffix, opcode, expected] of [
+    ['Eq', 0x99, '1:0'],
+    ['Ne', 0x9a, '0:1'],
+    ['Lt', 0x9b, '0:0'],
+    ['Ge', 0x9c, '1:1'],
+    ['Gt', 0x9d, '0:1'],
+    ['Le', 0x9e, '1:0'],
+  ] as const) {
+    const name = 'BooleanBranch' + suffix;
+    const bytes = new DynamicClassBuilder(name).build(
+      [0x1a, opcode, 0, 5, 0x03, 0xac, 0x04, 0xac],
+      '(Z)I',
+    );
+    bytes[7] = 49;
+    cases.push({ name, bytes, expected, mode: 'booleans' });
+  }
   for (const [name, bootstrapName, constantName, descriptor, expected] of [
     ['DynamicNull', 'nullConstant', 'nil', 'Ljava/lang/String;', 'null'],
     ['DynamicIntClass', 'primitiveClass', 'I', 'Ljava/lang/Class;', 'int'],

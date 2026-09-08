@@ -14,7 +14,16 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
     return {
       ...e,
       args: e.args.map((arg, i) =>
-        adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw),
+        adaptCallArgument(
+          arg,
+          e.descriptor,
+          i,
+          ctx,
+          e.owner,
+          e.name,
+          raw,
+          e.mode === 'static' || raw,
+        ),
       ),
     };
   }
@@ -23,6 +32,10 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
       ...e,
       args: e.args.map((arg, i) => adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, '<init>')),
     };
+  if (e.kind === 'assign-expr' && e.target.kind === 'field') {
+    const type = ctx.fieldTypeInfo(e.target.owner, e.target.name);
+    if (type) return { ...e, expr: adaptPrimitiveValue(e.expr, type) };
+  }
   if (e.kind === 'array-init')
     return { ...e, values: e.values.map((value) => adaptConst(value, e.elemType)) };
   if (e.kind === 'concat') {

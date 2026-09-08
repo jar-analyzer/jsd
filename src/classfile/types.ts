@@ -17,7 +17,7 @@ export interface MethodSig {
 export interface TypeParam {
   name: string;
   classBound: JType | null;
-  ifaceBound: JType | null;
+  ifaceBounds: JType[];
 }
 
 class SigReader {
@@ -74,7 +74,7 @@ class SigReader {
 
 export function parseFieldDescriptor(desc: string): JType {
   const r = new SigReader(desc);
-  const t = readType(r);
+  const t = readDescriptorType(r);
   if (!r.done) throw new Error(`trailing chars in descriptor ${desc}`);
   return t;
 }
@@ -85,12 +85,50 @@ export function parseMethodDescriptor(desc: string): { params: JType[]; ret: JTy
   const params: JType[] = [];
   while (r.peek() !== ')') {
     if (r.done) throw new Error(`bad method descriptor ${desc}`);
-    params.push(readType(r));
+    params.push(readDescriptorType(r));
   }
   r.expect(')');
-  const ret = readType(r);
+  const ret = r.try('V') ? P('void') : readDescriptorType(r);
   if (!r.done) throw new Error(`trailing chars in descriptor ${desc}`);
   return { params, ret };
+}
+
+function readDescriptorType(r: SigReader, dimensions = 0): JType {
+  if (r.try('[')) {
+    if (dimensions >= 255) throw new Error('array descriptor exceeds 255 dimensions');
+    return { kind: 'array', elem: readDescriptorType(r, dimensions + 1) };
+  }
+  if (r.try('L')) {
+    const start = r.pos;
+    while (!r.done && r.peek() !== ';') r.pos++;
+    const name = r.s.slice(start, r.pos);
+    if (!name || name.split('/').some((part) => !part || /[.;[<>]/.test(part)))
+      throw new Error('invalid class descriptor');
+    r.expect(';');
+    return { kind: 'class', name };
+  }
+  if (!'BCDFIJSZ'.includes(r.peek()) || r.done) throw new Error('invalid field descriptor');
+  return readType(r);
+}
+
+export interface ClassSig {
+  typeParams: TypeParam[];
+  superType: JType;
+  interfaces: JType[];
+}
+
+export function parseClassSignature(sig: string): ClassSig {
+  const r = new SigReader(sig);
+  const typeParams = r.peek() === '<' ? readTypeParams(r) : [];
+  const superType = readType(r);
+  if (superType.kind !== 'class') throw new Error('invalid superclass signature');
+  const interfaces: JType[] = [];
+  while (!r.done) {
+    const type = readType(r);
+    if (type.kind !== 'class') throw new Error('invalid interface signature');
+    interfaces.push(type);
+  }
+  return { typeParams, superType, interfaces };
 }
 
 function P(name: PrimName): JType {
@@ -138,38 +176,16 @@ function readClassType(r: SigReader): JType {
   let name = '';
   let args: JType[] | undefined;
   for (;;) {
-    const c = r.peek();
-    if (c === '' || c === ';') break;
-    if (c === '<') {
-      r.pos++;
-      args = readTypeArgs(r);
-      break;
-    }
-    name += r.next();
+    const start = r.pos;
+    while (!r.done && ![';', '<', '.'].includes(r.peek())) r.pos++;
+    if (r.pos === start) throw new Error('empty class signature name');
+    name += r.s.slice(start, r.pos);
+    args = r.try('<') ? readTypeArgs(r) : undefined;
+    if (!r.try('.')) break;
+    name += '$';
   }
-  r.try(';');
-  let result: JType = { kind: 'class', name, args };
-  while (r.peek() === '.') {
-    r.pos++;
-    let inner = '';
-    let innerArgs: JType[] | undefined;
-    for (;;) {
-      const c = r.peek();
-      if (c === '' || c === ';') break;
-      if (c === '<') {
-        r.pos++;
-        innerArgs = readTypeArgs(r);
-        break;
-      }
-      inner += r.next();
-    }
-    result = {
-      kind: 'class',
-      name: (result as { name: string }).name + '.' + inner,
-      args: innerArgs,
-    };
-  }
-  return result;
+  r.expect(';');
+  return { kind: 'class', name, args };
 }
 
 function readTypeArgs(r: SigReader): JType[] {
@@ -231,12 +247,13 @@ function readTypeParams(r: SigReader): TypeParam[] {
     let name = '';
     while (r.peek() !== ':' && r.peek() !== '>' && !r.done) name += r.next();
     let classBound: JType | null = null;
-    let ifaceBound: JType | null = null;
+    const ifaceBounds: JType[] = [];
     if (r.try(':')) {
       if (r.peek() !== ':') classBound = readType(r);
-      if (r.try(':')) ifaceBound = readType(r);
+      while (r.try(':')) ifaceBounds.push(readType(r));
     }
-    out.push({ name, classBound, ifaceBound });
+    if (!name) throw new Error('empty type parameter name');
+    out.push({ name, classBound, ifaceBounds });
   }
   r.expect('>');
   return out;

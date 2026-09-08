@@ -344,8 +344,41 @@ export class Simulator {
       cases.push({ value: null, target: this.blockOf(last.switchDefault!) });
       return { t: 'switch', ins: last, cases };
     }
-    if (op >= 0xac && op <= 0xb0) {
-      let expr = stack.depth > 0 ? stack.pop() : undefined;
+    if (op >= 0xac && op <= 0xb1) {
+      const ret = parseMethodDescriptor(this.method.descriptor).ret;
+      const expected =
+        ret.kind !== 'prim'
+          ? 0xb0
+          : ret.name === 'void'
+            ? 0xb1
+            : ret.name === 'long'
+              ? 0xad
+              : ret.name === 'float'
+                ? 0xae
+                : ret.name === 'double'
+                  ? 0xaf
+                  : 0xac;
+      if (op !== expected)
+        throw new SimFail(`return opcode disagrees with method descriptor at ${last.pc}`);
+      if (op === 0xb1) return { t: 'return' };
+      const entry = stack.popSE();
+      const actual = expressionType(entry.e);
+      const primitive = actual?.kind === 'prim' ? actual.name : undefined;
+      if (
+        entry.w !== (op === 0xad || op === 0xaf) ||
+        (actual &&
+          (op === 0xac
+            ? !primitive || !['boolean', 'byte', 'char', 'short', 'int'].includes(primitive)
+            : op === 0xad
+              ? primitive !== 'long'
+              : op === 0xae
+                ? primitive !== 'float'
+                : op === 0xaf
+                  ? primitive !== 'double'
+                  : primitive !== undefined))
+      )
+        throw new SimFail(`invalid return operand at ${last.pc}`);
+      let expr = entry.e;
       if (expr && this.method.name !== '<clinit>') {
         const ret = parseMethodDescriptor(this.method.descriptor).ret;
         if (
@@ -360,7 +393,6 @@ export class Simulator {
       }
       return { t: 'return', expr };
     }
-    if (op === 0xb1) return { t: 'return' };
     if (op === 0xbf) return { t: 'throw', expr: stack.pop() };
     if (op === 0xa8 || op === 0xc9 || op === 0xa9) {
       throw new SimFail('jsr/ret unsupported');

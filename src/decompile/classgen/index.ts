@@ -4,14 +4,13 @@ import {
   type DecompileStatus,
 } from '../diagnostics.js';
 import { Acc, ClassFile, FieldInfo, MethodInfo } from '../../classfile/model.js';
-import { JType, parseFieldDescriptor } from '../../classfile/types.js';
+import { JType, parseClassSignature, parseFieldDescriptor } from '../../classfile/types.js';
 import { Ctx } from '../context.js';
 import { nestedDisplay, simpleOf, typeStr, exprStr, RenderCtx } from '../printer/index.js';
 import {
   MethodSigInfo,
   buildMethodSig,
   sigType,
-  safeSig,
   typeParamStr,
   ctorHasOuterParam,
 } from './methodsig.js';
@@ -52,8 +51,8 @@ export class ClassGenerator {
     {
       superInternal: string;
       dropFirstArg: boolean;
-      noCtorArgs?: boolean;
-      captureFields?: { name: string; slot: number }[];
+      captureFields?: { name: string; displayName: string; index: number; type: JType }[];
+      superArgIndices?: number[];
       memberLines: string[];
     }
   >();
@@ -325,6 +324,15 @@ export class ClassGenerator {
     if (a & Acc.Static && !this.standalone && !isEnumCls) mods.push('static');
     if (a & Acc.Strict) mods.push('strictfp');
     if (this.cls.permitted.length) mods.push('sealed');
+    else if (
+      !(a & Acc.Final) &&
+      !isEnumCls &&
+      !this.isRecord &&
+      [this.cls.superName, ...this.cls.interfaces].some(
+        (parent) => parent && this.ctx.lookup(parent)?.permitted.includes(this.cls.name),
+      )
+    )
+      mods.push('non-sealed');
     const simple = simpleOf(nestedDisplay(this.cls.name));
     const displayName = this.memberName(simple);
 
@@ -336,7 +344,12 @@ export class ClassGenerator {
     else header += (header ? ' ' : '') + 'class';
     header += ` ${displayName}`;
 
-    const sig = this.cls.signature ? safeSig(this.cls.signature) : undefined;
+    let sig: ReturnType<typeof parseClassSignature> | undefined;
+    if (this.cls.signature) {
+      try {
+        sig = parseClassSignature(this.cls.signature);
+      } catch {}
+    }
     if (sig && 'typeParams' in sig && sig.typeParams.length) {
       header += `<${sig.typeParams.map((tp) => typeParamStr(tp, (t) => this.renderType(t))).join(', ')}>`;
     }
@@ -357,14 +370,22 @@ export class ClassGenerator {
       superName &&
       superName !== 'java/lang/Object'
     ) {
-      header += ` extends ${this.resolve(superName)}`;
+      header += ` extends ${sig ? this.renderType(sig.superType) : this.resolve(superName)}`;
     }
     if (this.isInterface && superName && superName !== 'java/lang/Object') {
     }
     const ifaces = this.cls.interfaces.filter((i) => i !== 'java/lang/annotation/Annotation');
     if (ifaces.length) {
       const kw = this.isInterface ? ' extends' : ' implements';
-      header += kw + ' ' + ifaces.map((i) => this.resolve(i)).join(', ');
+      header +=
+        kw +
+        ' ' +
+        ifaces
+          .map((i) => {
+            const type = sig?.interfaces.find((t) => t.kind === 'class' && t.name === i);
+            return type ? this.renderType(type) : this.resolve(i);
+          })
+          .join(', ');
     }
     if (this.cls.permitted.length) {
       header += ' permits ' + this.cls.permitted.map((i) => this.resolve(i)).join(', ');

@@ -95,8 +95,8 @@ function legacyOpts(name) {
   return ['-source', String(v), '-target', String(v)];
 }
 
-function java(dir, cls, cp = []) {
-  const r = spawnSync('java', ['-ea', ...cp.flatMap((c) => ['-cp', c]), cls], {
+function java(dir, cls, cp = [], assertions = '-ea') {
+  const r = spawnSync('java', [assertions, ...cp.flatMap((c) => ['-cp', c]), cls], {
     cwd: dir,
     encoding: 'utf8',
     timeout: 30000,
@@ -172,6 +172,21 @@ function runOne(fx, name) {
       detail: `--- original ---\n${r1.out}\n--- decompiled ---\n${r2.out}`,
       sources,
     };
+  }
+
+  if (name === 'RegressionAssertionModes' || name === 'RegressionAssertSpoof') {
+    const disabledOriginal = java(join(work, 'orig'), mainCls, [], '-da');
+    const disabledRecovered = java(join(work, 'rt'), mainCls, [], '-da');
+    if (
+      disabledOriginal.code !== 0 ||
+      disabledRecovered.code !== 0 ||
+      disabledOriginal.out !== disabledRecovered.out
+    )
+      return {
+        ok: false,
+        why: 'assertions-disabled behavior mismatch',
+        detail: `${disabledOriginal.out}\n${disabledRecovered.out}`,
+      };
   }
 
   const bad = sources.filter((s) => s.source.includes('DECOMPILATION FAILED'));

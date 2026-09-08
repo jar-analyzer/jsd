@@ -74,7 +74,7 @@ export function applyPatterns(
     },
   };
   let out = stmts;
-  out = foldAsserts(out);
+  out = foldAsserts(out, cls);
   out = foldTernary(out, sim, bctx);
   out = foldBoolTernary(out);
   for (let i = 0; i < 6; i++) {

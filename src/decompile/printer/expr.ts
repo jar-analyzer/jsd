@@ -1,7 +1,8 @@
 import { prepareExpression } from '../java/expressions.js';
+import { expressionType } from '../../ast/types.js';
 import { initialType } from '../java/types.js';
 import { javaLiteral } from './literals.js';
-import { AssignTarget, Expr } from '../../ast/ast.js';
+import { AssignTarget, Expr, walkExpr } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import {
   PREC,
@@ -115,30 +116,19 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       const anon = rc.anonClasses?.get(e.owner);
       if (anon) {
         const superDisplay = resolve(anon.superInternal, rc);
-        let args = e.args.map((a) => exprStr(a, rc, PREC.lambda));
-        if (anon.dropFirstArg && args.length > 0) args = args.slice(1);
-        let bodyLines = anon.memberLines;
-        if (anon.noCtorArgs) {
-          args = [];
-          const captures = anon.captureFields ?? [];
-          const renames = new Map<string, string>();
-          for (const c of captures) renames.set(c.name, 'cap' + c.name.slice(3));
-          bodyLines = anon.memberLines.map((line) => {
-            const m = line.match(/^(\s*)(private\s+[\w$.<>\[\], ?]+\s+)(val\$\w+);\s*$/);
-            if (m && renames.has(m[3])) {
-              const cap = captures.find((c) => c.name === m[3])!;
-              const captureSlotStart = 1 + (anon.dropFirstArg ? 1 : 0);
-              const argIdx = cap.slot - captureSlotStart;
-              const eIdx = argIdx + (anon.dropFirstArg ? 1 : 0);
-              const expr =
-                argIdx >= 0 && eIdx < e.args.length ? exprStr(e.args[eIdx], rc, PREC.assign) : null;
-              if (expr) return `${m[1]}${m[2]}${renames.get(m[3])} = ${expr};`;
-            }
-            let out = line;
-            for (const [from, to] of renames) out = out.split(from).join(to);
-            return out;
+        const args = (anon.superArgIndices ?? []).map((index) =>
+          exprStr(e.args[index], rc, PREC.lambda),
+        );
+        const captureLines = (anon.captureFields ?? []).map((capture) => {
+          const value = structuredClone(e.args[capture.index]);
+          if (!value) throw new Error('Missing anonymous capture argument');
+          walkExpr(value, (expr) => {
+            if (expr.kind === 'this')
+              Object.assign(expr, { kind: 'outer-this', owner: rc.className });
           });
-        }
+          return `    private final ${typeStr(capture.type, rc)} ${capture.displayName} = ${exprStr(value, rc, PREC.assign)};`;
+        });
+        const bodyLines = [...captureLines, ...anon.memberLines];
         const body = bodyLines.map((l) => (l ? '    ' + l : l)).join('\n');
         return [`new ${superDisplay}(${args.join(', ')}) {\n${body}\n}`, PREC.postfix - 2];
       }
@@ -190,19 +180,27 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       return [`${arr}[${idx}]`, PREC.postfix];
     }
     case 'field-get': {
+      const fieldName = rc.fieldNames?.get(e.owner + '#' + e.name) ?? e.name;
       if (e.target) {
-        if (e.name.startsWith('this$') && e.target.kind === 'this' && e.owner === rc.className) {
+        if (
+          e.name.startsWith('this$') &&
+          e.target.kind === 'this' &&
+          e.owner === rc.className &&
+          rc.ctx
+            .lookup(e.owner)
+            ?.fields.some((f) => f.name === e.name && (f.synthetic || f.access & 0x1000))
+        ) {
           const outer = outerOf(rc, e.owner);
           if (outer) return [`${resolve(outer, rc)}.this`, PREC.postfix];
         }
         if (e.target.kind === 'this' && e.owner === rc.className) {
-          return [`this.${e.name}`, PREC.postfix];
+          return [`this.${fieldName}`, PREC.postfix];
         }
-        const ts = exprStr(e.target, rc, PREC.postfix);
-        return [`${ts}.${e.name}`, PREC.postfix];
+        const ts = fieldReceiver(e.target, e.owner, e.name, rc);
+        return [`${ts}.${fieldName}`, PREC.postfix];
       }
-      if (e.owner === rc.className) return [e.name, PREC.postfix];
-      return [`${resolve(e.owner, rc)}.${e.name}`, PREC.postfix];
+      if (e.owner === rc.className) return [fieldName, PREC.postfix];
+      return [`${resolve(e.owner, rc)}.${fieldName}`, PREC.postfix];
     }
     case 'ternary': {
       const c = exprStr(e.cond, rc, PREC.ternary + 1);
@@ -310,14 +308,36 @@ function assignTargetStr(t: AssignTarget, rc: RenderCtx): string {
     case 'local':
       return lookupDeclared(rc, t.slot) ?? t.name;
     case 'field': {
+      const fieldName = rc.fieldNames?.get(t.owner + '#' + t.name) ?? t.name;
       if (t.target) {
-        if (t.target.kind === 'this' && t.owner === rc.className) return `this.${t.name}`;
-        return `${exprStr(t.target, rc, PREC.postfix)}.${t.name}`;
+        if (t.target.kind === 'this' && t.owner === rc.className) return `this.${fieldName}`;
+        return `${fieldReceiver(t.target, t.owner, t.name, rc)}.${fieldName}`;
       }
-      if (t.owner === rc.className) return t.name;
-      return `${resolve(t.owner, rc)}.${t.name}`;
+      if (t.owner === rc.className) return fieldName;
+      return `${resolve(t.owner, rc)}.${fieldName}`;
     }
     case 'array':
       return `${exprStr(t.array, rc, PREC.postfix)}[${exprStr(t.index, rc, PREC.lambda)}]`;
   }
+}
+
+function fieldReceiver(target: Expr, owner: string, name: string, rc: RenderCtx): string {
+  const type =
+    target.kind === 'this' ? { kind: 'class', name: rc.className } : expressionType(target);
+  if (type?.kind === 'class' && type.name !== owner) {
+    const seen = new Set<string>();
+    let current: string | null | undefined = type.name;
+    while (current && current !== owner && !seen.has(current)) {
+      seen.add(current);
+      const cls = rc.ctx.lookup(current);
+      if (!cls || cls.fields.some((f) => f.name === name))
+        return exprStr(
+          { kind: 'cast', jtype: { kind: 'class', name: owner }, expr: target },
+          rc,
+          PREC.postfix,
+        );
+      current = cls.superName;
+    }
+  }
+  return exprStr(target, rc, PREC.postfix);
 }

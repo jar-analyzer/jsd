@@ -11,6 +11,7 @@ export function adaptCallArgument(
   owner: string,
   name: string,
   rawReceiver = false,
+  allowUnknownOverloads = false,
 ): Expr {
   if (!descriptor) return a;
   const pt = parseMethodDescriptor(descriptor).params[i];
@@ -26,7 +27,14 @@ export function adaptCallArgument(
     return { kind: 'cast', jtype: at, expr: { ...a, erasedLambda: true } };
   }
   if (
-    hasReferenceOverload(ctx, owner, name, descriptor, i) &&
+    hasReferenceOverload(
+      ctx,
+      owner,
+      name,
+      descriptor,
+      i,
+      allowUnknownOverloads && (at?.kind === 'array' || (a.kind === 'const' && a.ctype === 'null')),
+    ) &&
     (!at || erasedType(at) !== erasedType(pt))
   ) {
     return { kind: 'cast', jtype: pt, expr: a };
@@ -44,6 +52,7 @@ function hasReferenceOverload(
   name: string,
   descriptor: string,
   index: number,
+  allowUnknown: boolean,
 ): boolean {
   const wanted = parseMethodDescriptor(descriptor);
   const visited = new Set<string>();
@@ -51,7 +60,7 @@ function hasReferenceOverload(
     if (visited.has(cn)) return false;
     visited.add(cn);
     const cf = ctx.lookup(cn);
-    if (!cf) return false;
+    if (!cf) return allowUnknown && cn === owner && wanted.params[index]?.kind !== 'array';
     for (const m of cf.methods) {
       if (m.name !== name || m.descriptor === descriptor || m.access & 0x1040) continue;
       const md = parseMethodDescriptor(m.descriptor);

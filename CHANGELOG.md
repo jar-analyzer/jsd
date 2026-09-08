@@ -2,15 +2,14 @@
 
 ## 1.0.4 dev
 
-- Improve support for dynamic constants.
-- Preserve lambda capture timing.
-- Support serializable lambdas.
-- Improve support for lambda interface bridges.
-- Improve support for guarded switches.
-- Prevent methods from being hidden solely by name prefixes.
-- Preserve one-time conversion of static string-concat constants.
-- Strengthen bootstrap validation.
-- Validate stack-map frames.
+- Improve dynamic bytecode support.
+- Improve lambda and method reference recovery.
+- Preserve field access and overload semantics.
+- Restore anonymous class initialization and captures.
+- Improve generic and sealed type recovery.
+- Avoid misidentifying compiler-generated code.
+- Correct boolean branch recovery.
+- Strengthen class-file and bytecode validation.
 - Add configurable resource limits.
 - Refine the demo.
 - Expand regression coverage.

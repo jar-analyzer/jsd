@@ -26,6 +26,11 @@ export function buildCFG(
   exceptionEntries: Set<number> = handlerPcs,
 ): CFG {
   if (instrs.length === 0) throw new Error('empty method');
+  const instructionStarts = new Set(instrs.map((ins) => ins.pc));
+  for (const ins of instrs)
+    for (const target of branchSuccessors(ins))
+      if (!instructionStarts.has(target))
+        throw new Error(`invalid branch target ${target} at pc ${ins.pc}`);
   const leaders = new Set<number>();
   leaders.add(instrs[0].pc);
   for (const ins of instrs) {

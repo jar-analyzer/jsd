@@ -62,12 +62,34 @@ export const condPart: ThisType<Simulator> & Pick<Simulator, 'buildCond' | 'isBo
       };
     }
     if (this.isBooleanish(v)) {
-      if (suffix === 'ne') return v;
-      return { kind: 'unary', op: '!', operand: v, jtype: PRIM_BOOL };
+      if (suffix === 'ne' || suffix === 'gt') return v;
+      if (suffix === 'eq' || suffix === 'le')
+        return { kind: 'unary', op: '!', operand: v, jtype: PRIM_BOOL };
+      return {
+        kind: 'binary',
+        op: cmpOp(suffix),
+        left: {
+          kind: 'ternary',
+          cond: v,
+          thenE: { kind: 'const', ctype: 'int', value: 1 },
+          elseE: INT0,
+        },
+        right: INT0,
+        jtype: PRIM_BOOL,
+      };
     }
     if (isBoolConst(v)) {
       const b = v.value === 1;
-      return { kind: 'const', ctype: 'boolean', value: suffix === 'ne' ? b : !b };
+      return {
+        kind: 'const',
+        ctype: 'boolean',
+        value:
+          suffix === 'ne' || suffix === 'gt'
+            ? b
+            : suffix === 'eq' || suffix === 'le'
+              ? !b
+              : suffix === 'ge',
+      };
     }
     return { kind: 'binary', op: cmpOp(suffix), left: v, right: INT0, jtype: PRIM_BOOL };
   },

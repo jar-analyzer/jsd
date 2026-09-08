@@ -1,3 +1,4 @@
+import { isAssertionFlag } from '../patterns/asserts.js';
 import { Stmt } from '../../ast/ast.js';
 import { Acc, ClassFile, FieldInfo, MethodInfo } from '../../classfile/model.js';
 import {
@@ -10,7 +11,7 @@ import {
 import { Ctx, JAVA_KEYWORDS } from '../context.js';
 
 export interface MethodSigInfo {
-  typeParams: { name: string; classBound: JType | null; ifaceBound: JType | null }[];
+  typeParams: { name: string; classBound: JType | null; ifaceBounds: JType[] }[];
   params: { name: string; type: JType; varargs?: boolean }[];
   ret: JType;
   thrown: JType[];
@@ -147,7 +148,7 @@ export function sigType(sig: string | undefined): JType | null {
 }
 
 export function typeParamStr(
-  tp: { name: string; classBound: JType | null; ifaceBound: JType | null },
+  tp: { name: string; classBound: JType | null; ifaceBounds: JType[] },
   rt: (t: JType) => string,
 ): string {
   const bounds: string[] = [];
@@ -157,20 +158,18 @@ export function typeParamStr(
   ) {
     bounds.push(rt(tp.classBound));
   }
-  if (tp.ifaceBound) {
-    bounds.push(rt(tp.ifaceBound));
-  }
+  bounds.push(...tp.ifaceBounds.map(rt));
   return bounds.length ? `${tp.name} extends ${bounds.join(' & ')}` : tp.name;
 }
 
-export function isSyntheticField(f: FieldInfo): boolean {
+export function isSyntheticField(f: FieldInfo, cls?: ClassFile): boolean {
+  if (f.name.startsWith('$assertionsDisabled')) return !!cls && isAssertionFlag(cls, f);
   return (
-    f.synthetic ||
-    f.name.startsWith('this$') ||
-    f.name.startsWith('$assertionsDisabled') ||
-    f.name.startsWith('$SwitchMap') ||
-    f.name === '$VALUES' ||
-    f.name === '$ENUM$VALUES'
+    (f.synthetic || (f.access & Acc.Synthetic) !== 0) &&
+    (f.name.startsWith('this$') ||
+      f.name.startsWith('$SwitchMap') ||
+      f.name === '$VALUES' ||
+      f.name === '$ENUM$VALUES')
   );
 }
 

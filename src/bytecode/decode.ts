@@ -121,6 +121,8 @@ export function decodeBytecode(code: Uint8Array): Instr[] {
 
     if (op === 0xc4) {
       const wop = r.u1();
+      if (![0x15, 0x16, 0x17, 0x18, 0x19, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x84, 0xa9].includes(wop))
+        throw new DecodeError(`invalid wide opcode at pc ${pc}`);
       const wname = OPCODES[wop]?.name ?? 'wide_unknown';
       ins.name = `wide ${wname}`;
       if (wop === 0x84) {

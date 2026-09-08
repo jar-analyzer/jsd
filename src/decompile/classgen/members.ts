@@ -104,7 +104,7 @@ export const membersPart: ThisType<ClassGenerator> &
     for (const f of this.cls.fields) {
       if (f.access & Acc.Enum) continue;
       if (recordFieldNames.has(f.name) && (f.access & 0x0002) !== 0 && isRecord) continue;
-      if (isSyntheticField(f)) continue;
+      if (isSyntheticField(f, this.cls)) continue;
       this.renderField(f);
     }
     for (const m of this.cls.methods) {
@@ -115,14 +115,7 @@ export const membersPart: ThisType<ClassGenerator> &
 
   renderField(f: FieldInfo): void {
     const a = f.access;
-    if (
-      f.name.startsWith('this$') ||
-      f.name.startsWith('$assertionsDisabled') ||
-      f.name.startsWith('$SwitchMap') ||
-      f.name.startsWith('$ENUM$VALUES') ||
-      f.name === '$VALUES'
-    )
-      return;
+    if (isSyntheticField(f, this.cls)) return;
     const mods: string[] = [];
     if (a & Acc.Public) mods.push('public');
     if (a & Acc.Private) mods.push('private');
@@ -294,7 +287,15 @@ export const membersPart: ThisType<ClassGenerator> &
       stmts = stmts.filter((st) => {
         if (st.kind !== 'expr') return true;
         const e = st.expr;
-        if (e.kind === 'assign-expr' && (e.target as { name?: string }).name === 'this$0')
+        if (
+          e.kind === 'assign-expr' &&
+          e.target.kind === 'field' &&
+          e.target.owner === this.cls.name &&
+          e.target.name === 'this$0' &&
+          this.cls.fields.some(
+            (f) => f.name === 'this$0' && (f.synthetic || f.access & Acc.Synthetic),
+          )
+        )
           return false;
         if (
           e.kind === 'invoke' &&
@@ -359,10 +360,8 @@ export const membersPart: ThisType<ClassGenerator> &
         const t = s.expr.target;
         if (
           t.kind === 'field' &&
-          (t.name === '$VALUES' ||
-            t.name === '$ENUM$VALUES' ||
-            t.name.startsWith('$SwitchMap') ||
-            t.name.startsWith('$assertionsDisabled'))
+          t.owner === this.cls.name &&
+          this.cls.fields.some((f) => f.name === t.name && isSyntheticField(f, this.cls))
         )
           return false;
         if (t.kind === 'field' && enumConsts.has(t.name)) return false;

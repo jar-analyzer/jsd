@@ -199,7 +199,9 @@ function methodRefStr(
       return `${ownerDisplay(ref.owner)}::${ref.name}`;
     }
     case 7:
-      return `super::${ref.name}`;
+      if (ref.owner === rc.className)
+        return `${exprStr(captured[0] ?? { kind: 'this' }, rc, 1)}::${ref.name}`;
+      return `${rc.ctx.lookup(ref.owner)?.access && rc.ctx.lookup(ref.owner)!.access & 0x0200 ? ownerDisplay(ref.owner) + '.' : ''}super::${ref.name}`;
     case 8: {
       return `${ownerDisplay(ref.owner)}::new`;
     }
@@ -252,7 +254,7 @@ function erasedMethodReference(
         ...ref,
         target,
         args: [...captured.slice(1), ...values],
-        superCall: handle.kind === 7,
+        superCall: handle.kind === 7 && ref.owner !== rc.className,
       };
     }
     return exprStr({ kind: 'lambda', params, body: [], exprBody: body }, rc, 1);

@@ -77,6 +77,7 @@ export interface RenderCtx extends ScopeContext {
   nameResolver?: (internal: string) => string;
   lambdaResolver?: (e: import('../../ast/ast.js').Expr) => string | null;
   slotLvtTypes?: Map<number, JType[]>;
+  fieldNames?: ReadonlyMap<string, string>;
   anonClasses?: Map<string, AnonInfo>;
   localClasses?: Map<string, { simpleName: string; dropFirstArg: boolean }>;
 }
@@ -84,8 +85,8 @@ export interface RenderCtx extends ScopeContext {
 export interface AnonInfo {
   superInternal: string;
   dropFirstArg: boolean;
-  noCtorArgs?: boolean;
-  captureFields?: { name: string; slot: number }[];
+  captureFields?: { name: string; displayName: string; index: number; type: JType }[];
+  superArgIndices?: number[];
   memberLines: string[];
 }
 
