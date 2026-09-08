@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title data-i18n="title">jsd — Java class decompiler</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <a class="logo" href="https://github.com/jar-analyzer/jsd" aria-label="jsd on GitHub"
+        >j<span>sd</span></a
+      >
+      <span class="tag" data-i18n="tag">Java decompiler</span>
+      <button
+        id="btnQuickOpen"
+        class="workspace-title"
+        disabled
+        data-i18n-title="quickOpen"
+        data-i18n-aria="quickOpen"
+      >
+        <span data-i18n="quickOpen">Go to file…</span><kbd>⌘ / Ctrl P</kbd>
+      </button>
+      <span class="spacer"></span>
+      <button class="primary" id="btnOpen" data-i18n="btnOpen">Open files</button>
+      <div id="langSwitch" aria-label="Language">
+        <button data-lang="en" lang="en">EN</button>
+        <button data-lang="zh" lang="zh-CN">中文</button>
+      </div>
+      <input type="file" id="fileInput" accept=".jar,.war,.class,.zip" multiple hidden />
+    </header>
+    <main>
+      <nav id="activityBar" aria-label="Workspace">
+        <button
+          id="btnExplorer"
+          data-i18n-title="filesTitle"
+          data-i18n-aria="filesTitle"
+          aria-controls="sidebar"
+          aria-expanded="true"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 3h11v15H8zM5 6H3v15h12v-2" />
+          </svg>
+        </button>
+        <button id="btnSearch" data-i18n-title="searchPh" data-i18n-aria="searchPh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10" cy="10" r="6.5" />
+            <path d="m15 15 6 6" />
+          </svg>
+        </button>
+        <span class="spacer"></span>
+        <a href="https://github.com/jar-analyzer/jsd" aria-label="GitHub" title="GitHub"
+          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6-6 6 6 6m6-12 6 6-6 6" /></svg
+        ></a>
+      </nav>
+      <aside id="sidebar" aria-label="Files">
+        <div class="section-heading">
+          <span data-i18n="filesTitle">EXPLORER</span
+          ><button id="btnClear" disabled data-i18n="clear">Clear</button>
+        </div>
+        <button id="drop" type="button">
+          <strong data-i18n="dropTitle">Drop Java files here</strong>
+          <span>.class · .jar · .war · .zip</span>
+          <small data-i18n="dropClick">or click to choose files</small>
+        </button>
+        <div id="toolbar" hidden>
+          <input
+            id="search"
+            type="search"
+            data-i18n-ph="searchPh"
+            data-i18n-aria="searchPh"
+            placeholder="Filter class or package…"
+            autocomplete="off"
+          />
+          <button
+            class="mini"
+            id="btnExpand"
+            data-i18n-title="expandAll"
+            data-i18n-aria="expandAll"
+          >
+            ⊕
+          </button>
+          <button
+            class="mini"
+            id="btnCollapse"
+            data-i18n-title="collapseTop"
+            data-i18n-aria="collapseTop"
+          >
+            ⊖
+          </button>
+        </div>
+        <div id="tree"></div>
+        <p class="sidebar-note" data-i18n="localNote">Your files stay in this browser.</p>
+      </aside>
+      <div
+        id="resizeSidebar"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        aria-controls="sidebar"
+        data-i18n-aria="resizeExplorer"
+        aria-valuemin="180"
+        aria-valuemax="600"
+        aria-valuenow="280"
+      ></div>
+      <section id="viewer" aria-busy="false">
+        <div id="viewerBar">
+          <span id="barText" data-i18n="pickClass">Select a class file</span>
+          <span class="spacer"></span>
+          <button id="btnFind" disabled data-i18n="findSource" data-i18n-title="findShortcut">
+            Find
+          </button>
+          <button id="btnCopy" disabled data-i18n="btnCopy">Copy source</button>
+          <button id="btnDownload" disabled data-i18n="btnDownload">Download .java</button>
+        </div>
+        <div id="breadcrumbs" data-i18n="pickClass"></div>
+        <div id="findBar" hidden role="search" data-i18n-aria="findSource">
+          <div class="find-input-wrap">
+            <input
+              id="findInput"
+              data-i18n-ph="findSource"
+              data-i18n-aria="findSource"
+              autocomplete="off"
+              spellcheck="false"
+            /><button
+              id="findCase"
+              aria-pressed="false"
+              data-i18n-title="matchCase"
+              data-i18n-aria="matchCase"
+            >
+              Aa</button
+            ><button
+              id="findWord"
+              aria-pressed="false"
+              data-i18n-title="wholeWord"
+              data-i18n-aria="wholeWord"
+            >
+              ab
+            </button>
+          </div>
+          <span id="findCount" role="status" aria-live="polite"></span>
+          <button
+            id="findPrev"
+            disabled
+            data-i18n-title="previousMatch"
+            data-i18n-aria="previousMatch"
+          >
+            ↑</button
+          ><button id="findNext" disabled data-i18n-title="nextMatch" data-i18n-aria="nextMatch">
+            ↓</button
+          ><button id="findClose" data-i18n-title="close" data-i18n-aria="close">×</button>
+        </div>
+        <div id="notice" role="status" aria-live="polite" hidden>
+          <span id="noticeText"></span
+          ><button id="dismissNotice" data-i18n-aria="dismiss">×</button>
+        </div>
+        <details id="diagnostics" hidden>
+          <summary id="diagnosticSummary"></summary>
+          <ul id="diagnosticList"></ul>
+        </details>
+        <div id="welcome">
+          <div class="welcome-mark" aria-hidden="true">{ }</div>
+          <h1 data-i18n="welcomeTitle">From bytecode to readable Java</h1>
+          <p data-i18n="welcomeHint">
+            Open a class or archive, then explore its source. No installation or upload required.
+          </p>
+          <div class="welcome-steps">
+            <span data-i18n="stepOpen">01 · Open files</span
+            ><span data-i18n="stepSelect">02 · Select a class</span
+            ><span data-i18n="stepExport">03 · Copy or download</span>
+          </div>
+        </div>
+        <div id="noSource" hidden data-i18n="noSource">
+          No Java source was produced. Review the diagnostics above.
+        </div>
+        <div id="codeWrap" hidden tabindex="0" aria-label="Java source"><div id="code"></div></div>
+        <div id="sourceStats" aria-live="polite"></div>
+        <div id="loading" role="status" aria-live="polite">
+          <div class="spinner"></div>
+          <div id="loadingText"></div>
+          <button id="btnCancel" data-i18n="cancel">Cancel</button>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span class="remote-mark" aria-hidden="true">&gt;&lt;</span><span id="statFiles"></span
+      ><span id="statCache"></span><span class="spacer"></span
+      ><span class="local-status" data-i18n="localNote">Your files stay in this browser.</span
+      ><span>Java</span><span>UTF-8</span>
+    </footer>
+    <dialog id="quickOpen" data-i18n-aria="quickOpen">
+      <div class="quick-header">
+        <input
+          id="quickInput"
+          role="combobox"
+          aria-expanded="true"
+          aria-autocomplete="list"
+          aria-controls="quickResults"
+          data-i18n-ph="quickHint"
+          data-i18n-aria="quickOpen"
+          autocomplete="off"
+          spellcheck="false"
+        /><button id="quickClose" data-i18n-aria="close">×</button>
+      </div>
+      <div id="quickResults" role="listbox" data-i18n-aria="quickOpen"></div>
+      <p id="quickEmpty" hidden data-i18n="noMatch"></p>
+      <div class="quick-footer">
+        <span id="quickCount" role="status"></span
+        ><span data-i18n="quickKeys">↑↓ navigate · Enter open · Esc close</span>
+      </div>
+    </dialog>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

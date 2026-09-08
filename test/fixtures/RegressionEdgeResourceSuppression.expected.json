@@ -1,0 +1,3 @@
+{
+  "stdout": "+A+Bbody-B-A\nbody\n+A+Bbody-B-A\nB\nsuppressed:A\n+A+Bbody-B-A\nbody\nsuppressed:B\nsuppressed:A\n+A+Bbody-B-A\n"
+}

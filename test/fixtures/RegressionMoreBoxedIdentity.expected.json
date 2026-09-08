@@ -1,0 +1,3 @@
+{
+  "stdout": "true:true:true\nfalse:true:true\ntrue:true\nnull-unbox\n"
+}

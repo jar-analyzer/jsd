@@ -1,0 +1,271 @@
+#viewer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+#viewerBar {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  background: #252526;
+  border-bottom: 1px solid #1e1e1e;
+  font-size: 12px;
+}
+#barText {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 65%;
+  min-width: 0;
+  padding: 0 16px;
+  border-top: 1px solid #007acc;
+  background: var(--bg);
+  overflow: hidden;
+  white-space: nowrap;
+}
+#barText .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e5e5e5;
+}
+#barText .status-ok {
+  color: #89d185;
+  font-size: 10px;
+}
+#barText .status-fail {
+  color: #cca700;
+  font-size: 10px;
+}
+#viewerBar button {
+  font-size: 11px;
+  white-space: nowrap;
+}
+#breadcrumbs {
+  height: 24px;
+  flex: none;
+  padding: 2px 16px;
+  font-size: 11px;
+  color: #969696;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #ffffff04;
+}
+#welcome {
+  margin: auto;
+  max-width: 660px;
+  padding: 40px;
+}
+.welcome-mark {
+  color: #454545;
+  font:
+    80px/1 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: -8px;
+  margin-bottom: 26px;
+}
+#welcome h1 {
+  font-size: clamp(23px, 3vw, 32px);
+  font-weight: 300;
+  color: #ddd;
+  line-height: 1.3;
+  margin-bottom: 12px;
+}
+#welcome p {
+  color: #969696;
+  line-height: 1.8;
+  max-width: 470px;
+}
+.welcome-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
+  color: #75beff;
+  font-size: 12px;
+}
+#noSource {
+  margin: auto;
+  padding: 30px;
+  color: var(--muted);
+}
+#codeWrap {
+  flex: 1;
+  overflow: auto;
+  background: var(--code-bg);
+}
+#code {
+  padding: 10px 0 30px;
+  display: table;
+  min-width: 100%;
+  tab-size: 4;
+  font:
+    13px/1.65 'SFMono-Regular',
+    Consolas,
+    'Liberation Mono',
+    Menlo,
+    monospace;
+}
+#code .ln {
+  display: table-cell;
+  position: sticky;
+  left: 0;
+  background: var(--code-bg);
+  color: #858585;
+  text-align: right;
+  padding: 0 20px;
+  user-select: none;
+  white-space: pre;
+}
+#code .src {
+  display: table-cell;
+  padding-right: 28px;
+  white-space: pre;
+}
+#code ::selection {
+  background: #264f78;
+}
+#sourceStats {
+  height: 23px;
+  flex: none;
+  padding: 3px 14px;
+  font-size: 10px;
+  color: #858585;
+  border-top: 1px solid #2b2b2b;
+  text-align: right;
+}
+#notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  background: #253629;
+  border-bottom: 1px solid #363636;
+}
+#notice.error {
+  color: #f48771;
+  background: #382623;
+}
+#noticeText {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+#dismissNotice {
+  font-size: 18px;
+  padding: 0 4px;
+}
+#diagnostics {
+  padding: 8px 16px;
+  border-bottom: 1px solid #454545;
+  max-height: 180px;
+  overflow: auto;
+  color: #d7ba7d;
+}
+#diagnostics summary {
+  cursor: pointer;
+}
+#diagnosticList {
+  padding-left: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#loading {
+  position: absolute;
+  inset: 60px 0 23px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  background: #1e1e1eed;
+  z-index: 3;
+}
+#loading.show {
+  display: flex;
+}
+#btnCancel {
+  border: 1px solid #454545;
+}
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #3c3c3c;
+  border-top-color: #007acc;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hljs {
+  color: #d4d4d4;
+  background: transparent;
+}
+.hljs-keyword,
+.hljs-literal,
+.hljs-built_in {
+  color: #569cd6;
+}
+.hljs-type,
+.hljs-title.class_ {
+  color: #4ec9b0;
+}
+.hljs-title.function_,
+.hljs-title {
+  color: #dcdcaa;
+}
+.hljs-string,
+.hljs-regexp {
+  color: #ce9178;
+}
+.hljs-number {
+  color: #b5cea8;
+}
+.hljs-comment,
+.hljs-quote {
+  color: #6a9955;
+}
+.hljs-meta,
+.hljs-doctag {
+  color: #d7ba7d;
+}
+.hljs-variable,
+.hljs-params,
+.hljs-property {
+  color: #9cdcfe;
+}
+@media (max-width: 700px) {
+  #viewerBar {
+    gap: 0;
+    padding-right: 2px;
+  }
+  #barText {
+    padding: 0 8px;
+    flex: 1;
+    max-width: none;
+  }
+  #barText .status-ok,
+  #barText .status-fail {
+    display: none;
+  }
+  #viewerBar button {
+    padding: 3px 5px;
+    font-size: 10px;
+  }
+  #welcome {
+    padding: 24px;
+  }
+  .welcome-mark {
+    font-size: 60px;
+  }
+}

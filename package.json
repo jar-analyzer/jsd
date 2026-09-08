@@ -1,0 +1,59 @@
+{
+  "name": "@jar-analyzer/jsd",
+  "version": "1.0.0",
+  "description": "Pure TypeScript Java class decompiler — single-file library, no wasm, no native deps",
+  "type": "module",
+  "main": "./dist/jsd.min.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/jsd.min.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "java",
+    "decompiler",
+    "bytecode",
+    "class-file",
+    "reverse-engineering",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jar-analyzer/jsd.git"
+  },
+  "homepage": "https://github.com/jar-analyzer/jsd#readme",
+  "bugs": {
+    "url": "https://github.com/jar-analyzer/jsd/issues"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "tsc --emitDeclarationOnly && node scripts/build.mjs",
+    "sync": "cp dist/jsd.min.js demo/jsd.browser.js",
+    "check": "tsc --noEmit",
+    "test": "npm run build && npm run test:unit && node test/run-e2e.mjs",
+    "test:modern": "npm run build && node test/run-modern.mjs",
+    "fuzz": "node test/fuzz.mjs",
+    "test:unit": "node test/run-unit.mjs",
+    "test:all": "npm test && node test/run-e2e.mjs --no-debug && node test/run-modern.mjs --require-all && node test/run-modern.mjs --require-all --no-debug && node test/run-package.mjs",
+    "test:nodebug": "npm run build && node test/run-e2e.mjs --no-debug",
+    "test:package": "npm run build && node test/run-package.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "esbuild": "^0.28.2",
+    "prettier": "3.9.6",
+    "prettier-plugin-java": "2.10.3",
+    "typescript": "^7.0.2"
+  }
+}

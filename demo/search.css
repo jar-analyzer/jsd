@@ -1,0 +1,193 @@
+header .workspace-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  width: min(420px, 36%);
+  height: 26px;
+  padding: 2px 10px;
+  border: 1px solid #525252;
+  background: #3c3c3c;
+  border-radius: 5px;
+  pointer-events: auto;
+  text-align: left;
+}
+.workspace-title kbd {
+  color: #aaa;
+  font: 10px inherit;
+  white-space: nowrap;
+}
+#findBar {
+  position: absolute;
+  top: 60px;
+  right: 14px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: min(460px, calc(100% - 20px));
+  padding: 5px;
+  background: #252526;
+  border: 1px solid #454545;
+  border-top: 2px solid #007acc;
+  box-shadow: 0 3px 10px #0006;
+}
+.find-input-wrap {
+  min-width: 65px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-right: 2px;
+  background: #3c3c3c;
+  border: 1px solid transparent;
+}
+.find-input-wrap:focus-within {
+  border-color: #007fd4;
+}
+#findInput {
+  width: 0;
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 3px 5px;
+  color: #ddd;
+  font-size: 12px;
+}
+.find-input-wrap:has([aria-invalid='true']) {
+  border-color: #be1100;
+}
+#findBar button {
+  padding: 1px 4px;
+  min-width: 22px;
+  height: 24px;
+  font-size: 13px;
+}
+#findBar button[aria-pressed='true'] {
+  color: #fff;
+  background: #094771;
+  border-color: #007fd4;
+}
+#findWord {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#findCount {
+  flex: none;
+  min-width: 42px;
+  text-align: center;
+  color: #bbb;
+  font-size: 11px;
+}
+mark.find-match {
+  color: inherit;
+  background: #613c17;
+  outline: 1px solid #a96f23;
+}
+mark.find-match.active {
+  background: #515c6a;
+  outline-color: #f0a84f;
+}
+#quickOpen {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100vw - 24px));
+  max-height: min(65vh, 550px);
+  margin: 0;
+  padding: 6px 0 0;
+  color: #ddd;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px #0009;
+  overflow: hidden;
+}
+#quickOpen::backdrop {
+  background: #0003;
+}
+.quick-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 6px;
+}
+#quickInput {
+  width: 0;
+  flex: 1;
+  padding: 7px 9px;
+  color: #ddd;
+  background: #3c3c3c;
+  border: 1px solid #007fd4;
+  border-radius: 2px;
+}
+#quickClose {
+  padding: 2px 6px;
+  font-size: 19px;
+}
+#quickResults {
+  max-height: calc(min(65vh, 550px) - 83px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.quick-result {
+  padding: 5px 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  min-height: 29px;
+}
+.quick-result:hover {
+  background: #2a2d2e;
+}
+.quick-result[aria-selected='true'] {
+  background: #04395e;
+}
+.quick-name {
+  flex: none;
+  font-size: 13px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-path {
+  color: #999;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.quick-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 10px;
+  border-top: 1px solid #333;
+  color: #999;
+  font-size: 10px;
+}
+#quickEmpty {
+  padding: 20px 12px;
+  color: #999;
+}
+@media (max-width: 700px) {
+  header .workspace-title {
+    display: none;
+  }
+  #findBar {
+    right: 5px;
+    width: calc(100% - 10px);
+  }
+  #findBar button {
+    min-width: 20px;
+    padding: 1px 3px;
+  }
+  .quick-footer {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+}

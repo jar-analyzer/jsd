@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# test & coverage artifacts
+coverage/
+.nyc_output/
+
+# java archives (test inputs)
+*.jar
+*.class
+*.war

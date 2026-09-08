@@ -1,0 +1,3 @@
+{
+  "stdout": "aiv:NullPointerException\naiv:ArrayIndexOutOfBoundsException\naiv:ArrayStoreException\naiv:ok:42\n"
+}

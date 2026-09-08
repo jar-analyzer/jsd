@@ -1,0 +1,258 @@
+@import url('./explorer.css');
+@import url('./editor.css');
+@import url('./search.css');
+
+:root {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --border: #303031;
+  --fg: #cccccc;
+  --muted: #969696;
+  --accent: #007acc;
+  --sel: #094771;
+  --sidebar-width: 280px;
+  --code-bg: #1e1e1e;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  font:
+    13px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+}
+[hidden] {
+  display: none !important;
+}
+.spacer {
+  flex: 1;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: #ffffff14;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid #007fd4;
+  outline-offset: -1px;
+}
+header {
+  height: 38px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  background: #323233;
+  border-bottom: 1px solid #252526;
+}
+.logo {
+  color: #e8e8e8;
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+}
+.logo span {
+  color: #75beff;
+}
+.workspace-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 36%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #bdbdbd;
+  font-size: 12px;
+  pointer-events: none;
+}
+header .tag {
+  color: var(--muted);
+  font-size: 11px;
+}
+header .primary {
+  background: #0e639c;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 12px;
+}
+header .primary:hover {
+  background: #1177bb;
+}
+#langSwitch {
+  display: flex;
+  gap: 2px;
+}
+#langSwitch button {
+  font-size: 11px;
+  padding: 2px 6px;
+  color: #aaa;
+}
+#langSwitch .on {
+  color: #fff;
+  background: #ffffff12;
+}
+main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+#activityBar {
+  width: 48px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: #333333;
+}
+#activityBar button,
+#activityBar a {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #969696;
+  padding: 12px;
+  border: 0;
+  border-radius: 0;
+}
+#activityBar svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+#activityBar button:hover,
+#activityBar a:hover {
+  color: #fff;
+  background: transparent;
+}
+#activityBar #btnExplorer {
+  color: #fff;
+  border-left: 2px solid #fff;
+  padding-left: 10px;
+}
+.sidebar-hidden #activityBar #btnExplorer {
+  color: #969696;
+  border-color: transparent;
+}
+#resizeSidebar {
+  width: 4px;
+  flex: none;
+  cursor: col-resize;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  touch-action: none;
+  z-index: 2;
+}
+#resizeSidebar:hover,
+#resizeSidebar:focus-visible,
+body.resizing #resizeSidebar {
+  background: var(--accent);
+}
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+.sidebar-hidden #sidebar,
+.sidebar-hidden #resizeSidebar {
+  display: none;
+}
+footer {
+  height: 23px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 12px;
+  background: #007acc;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+footer .remote-mark {
+  background: #16825d;
+  align-self: stretch;
+  margin-left: -12px;
+  padding: 1px 12px;
+  font: bold 15px monospace;
+}
+@media (max-width: 700px) {
+  header {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  header .tag,
+  .workspace-title,
+  footer .local-status {
+    display: none;
+  }
+  #activityBar {
+    width: 42px;
+  }
+  #activityBar button,
+  #activityBar a {
+    height: 44px;
+    padding: 10px;
+  }
+  #sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 42px;
+    width: min(280px, calc(100vw - 70px));
+    z-index: 5;
+    box-shadow: 5px 0 12px #0006;
+  }
+  #resizeSidebar {
+    display: none;
+  }
+  footer {
+    gap: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
