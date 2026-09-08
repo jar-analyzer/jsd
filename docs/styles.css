@@ -1,6 +1,7 @@
 @import url('./explorer.css');
 @import url('./editor.css');
 @import url('./search.css');
+@import url('./welcome.css');
 
 :root {
   color-scheme: dark;

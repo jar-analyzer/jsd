@@ -8,6 +8,20 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="icon-code" d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18" />
+        <path id="icon-browser" d="M3 8h18M7 5h.01M10 5h.01M3 3h18v18H3z" />
+        <path id="icon-terminal" d="m5 7 5 5-5 5m8 0h6" />
+        <path id="icon-copy" d="M9 9h12v12H9zM15 9V3H3v12h6" />
+        <path id="icon-upload" d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6" />
+        <path id="icon-arrow" d="M7 17 17 7M7 7h10v10" />
+        <path
+          id="icon-github"
+          d="M9 19c-4.3 1.3-4.3-2.2-6-2.7m12 5v-3.4a3 3 0 0 0-.8-2.3c2.7-.3 5.5-1.3 5.5-6A4.7 4.7 0 0 0 18.4 6a4.3 4.3 0 0 0-.1-3.5S17.3 2.2 15 3.8a12 12 0 0 0-6 0C6.7 2.2 5.7 2.5 5.7 2.5A4.3 4.3 0 0 0 5.6 6a4.7 4.7 0 0 0-1.3 3.6c0 4.7 2.8 5.7 5.5 6A3 3 0 0 0 9 18v3.3"
+        />
+      </defs>
+    </svg>
     <header>
       <a class="logo" href="https://github.com/jar-analyzer/jsd" aria-label="jsd on GitHub"
         >j<span>sd</span></a
@@ -51,7 +65,7 @@
         </button>
         <span class="spacer"></span>
         <a href="https://github.com/jar-analyzer/jsd" aria-label="GitHub" title="GitHub"
-          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6-6 6 6 6m6-12 6 6-6 6" /></svg
+          ><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-github" /></svg
         ></a>
       </nav>
       <aside id="sidebar" aria-label="Files">
@@ -160,16 +174,30 @@
           <ul id="diagnosticList"></ul>
         </details>
         <div id="welcome">
-          <div class="welcome-mark" aria-hidden="true">{ }</div>
-          <h1 data-i18n="welcomeTitle">From bytecode to readable Java</h1>
-          <p data-i18n="welcomeHint">
-            Open a class or archive, then explore its source. No installation or upload required.
-          </p>
+          <div class="welcome-intro">
+            <div class="welcome-brand">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#icon-code" /></svg
+              ><span>jsd</span><span class="version-badge">v1.0.3</span>
+            </div>
+            <h1 data-i18n="welcomeTitle">From bytecode to readable Java</h1>
+            <p data-i18n="welcomeHint">
+              Open a class or archive, then explore its source. No installation or upload required.
+            </p>
+            <div class="welcome-actions">
+              <button class="welcome-open" id="welcomeOpen">
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-upload" /></svg
+                ><span data-i18n="btnOpen">Open files</span>
+              </button>
+              <span class="welcome-formats">.class / .jar / .war / .zip</span>
+            </div>
+          </div>
           <section class="library-info" data-i18n-aria="libraryInfo">
             <div class="library-heading">
               <span class="js-file-icon" aria-hidden="true">JS</span>
               <span>jsd.min.js</span>
-              <span class="library-format">ESM</span>
+              <span class="library-format">ESM · MIT</span>
             </div>
             <div class="library-metrics">
               <div>
@@ -192,35 +220,164 @@
               One JS file is all you need to decompile .class files in Node.js or your browser.
             </p>
             <a class="project-link" href="https://github.com/jar-analyzer/jsd">
-              <span data-i18n="githubSource">Source on GitHub</span>
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <use href="#icon-github" /></svg
+              ><span data-i18n="githubSource">Source on GitHub</span>
               <span class="project-address"
-                >github.com/jar-analyzer/jsd <span aria-hidden="true">↗</span></span
-              >
+                >github.com/jar-analyzer/jsd
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-arrow" /></svg
+              ></span>
             </a>
           </section>
-          <div class="welcome-steps">
-            <span data-i18n="stepOpen">01 · Open files</span
-            ><span data-i18n="stepSelect">02 · Select a class</span
-            ><span data-i18n="stepExport">03 · Copy or download</span>
-          </div>
-          <details class="usage-example">
-            <summary data-i18n="usageTitle">Use jsd in your own page</summary>
-            <p data-i18n="usageHint">
-              Save this as an HTML file, serve it over HTTP, then choose a .class file to decompile.
+          <section class="usage-section" aria-labelledby="usageHeading">
+            <div class="usage-heading">
+              <h2 id="usageHeading" data-i18n="usageTitle">Start building with jsd</h2>
+              <a href="https://www.npmjs.com/package/@jar-analyzer/jsd"
+                >npm <span>v1.0.3</span
+                ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-arrow" /></svg
+              ></a>
+            </div>
+            <p data-i18n="usageIntro">
+              Add the same lightweight library to your browser or Node.js project.
             </p>
-            <pre><code>&lt;input type="file" accept=".class" /&gt;
-&lt;pre id="source"&gt;&lt;/pre&gt;
-&lt;script type="module"&gt;
-  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.0.3/dist/jsd.min.js';
+            <div class="usage-tabs" role="tablist" data-i18n-aria="usageEnvironment">
+              <button id="tabBrowser" role="tab" aria-selected="true" aria-controls="usageBrowser">
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-browser" /></svg
+                ><span data-i18n="browserUsage">Browser</span>
+              </button>
+              <button
+                id="tabNode"
+                role="tab"
+                aria-selected="false"
+                aria-controls="usageNode"
+                tabindex="-1"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-terminal" /></svg
+                ><span>Node.js</span>
+              </button>
+            </div>
+            <div id="usageBrowser" class="usage-panel" role="tabpanel" aria-labelledby="tabBrowser">
+              <p data-i18n="usageHint">
+                Save as index.html and serve over HTTP. Select a .class file to see its source.
+              </p>
+              <div class="example-code">
+                <div class="example-toolbar">
+                  <span
+                    ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-code" /></svg
+                    >index.html</span
+                  ><button
+                    data-copy-example="exampleBrowser"
+                    data-i18n-title="copyExample"
+                    data-i18n-aria="copyExample"
+                  >
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-copy" />
+                    </svg>
+                  </button>
+                </div>
+                <pre
+                  tabindex="0"
+                ><code id="exampleBrowser" data-example-language="xml">&lt;input type=&quot;file&quot; accept=&quot;.class&quot; /&gt;
+&lt;pre id=&quot;source&quot;&gt;&lt;/pre&gt;
+&lt;script type=&quot;module&quot;&gt;
+  import { decompileClassFile } from
+    &#x27;https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.0.3/dist/jsd.min.js&#x27;;
 
-  document.querySelector('input').onchange = async (event) =&gt; {
+  document.querySelector(&#x27;input&#x27;).onchange = async (event) =&gt; {
     const file = event.target.files[0];
     if (!file) return;
+
     const bytes = new Uint8Array(await file.arrayBuffer());
-    document.getElementById('source').textContent = decompileClassFile(bytes).source;
+    document.getElementById(&#x27;source&#x27;).textContent =
+      decompileClassFile(bytes).source;
   };
 &lt;/script&gt;</code></pre>
-          </details>
+              </div>
+            </div>
+            <div
+              id="usageNode"
+              class="usage-panel"
+              role="tabpanel"
+              aria-labelledby="tabNode"
+              hidden
+            >
+              <p data-i18n="nodeHint">
+                Requires Node.js 20 or later. Install the package, then save the example alongside
+                Example.class.
+              </p>
+              <div class="example-code">
+                <div class="example-toolbar">
+                  <span
+                    ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-terminal" /></svg
+                    >Terminal</span
+                  ><button
+                    data-copy-example="exampleInstall"
+                    data-i18n-title="copyExample"
+                    data-i18n-aria="copyExample"
+                  >
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-copy" />
+                    </svg>
+                  </button>
+                </div>
+                <pre
+                  tabindex="0"
+                ><code id="exampleInstall" data-example-language="bash">npm install @jar-analyzer/jsd</code></pre>
+              </div>
+              <div class="example-code">
+                <div class="example-toolbar">
+                  <span
+                    ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-code" /></svg
+                    >example.mjs</span
+                  ><button
+                    data-copy-example="exampleNode"
+                    data-i18n-title="copyExample"
+                    data-i18n-aria="copyExample"
+                  >
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-copy" />
+                    </svg>
+                  </button>
+                </div>
+                <pre
+                  tabindex="0"
+                ><code id="exampleNode" data-example-language="javascript">import { readFileSync } from &#x27;node:fs&#x27;;
+import { decompileClassFile } from &#x27;@jar-analyzer/jsd&#x27;;
+
+const bytes = readFileSync(&#x27;Example.class&#x27;);
+const result = decompileClassFile(bytes);
+console.log(result.source);</code></pre>
+              </div>
+              <div class="example-code">
+                <div class="example-toolbar">
+                  <span
+                    ><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-terminal" /></svg
+                    >Terminal</span
+                  ><button
+                    data-copy-example="exampleRun"
+                    data-i18n-title="copyExample"
+                    data-i18n-aria="copyExample"
+                  >
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#icon-copy" />
+                    </svg>
+                  </button>
+                </div>
+                <pre
+                  tabindex="0"
+                ><code id="exampleRun" data-example-language="bash">node example.mjs</code></pre>
+              </div>
+            </div>
+            <p id="exampleCopyStatus" role="status" aria-live="polite"></p>
+          </section>
         </div>
         <div id="noSource" hidden data-i18n="noSource">
           No Java source was produced. Review the diagnostics above.

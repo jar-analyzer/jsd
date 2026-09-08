@@ -15,6 +15,14 @@ export function loadHighlighter(refresh) {
   import('https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/+esm')
     .then((module) => {
       highlighter = module.default;
+      document.querySelectorAll('[data-example-language]').forEach((code) => {
+        try {
+          code.innerHTML = highlighter.highlight(code.textContent, {
+            language: code.dataset.exampleLanguage,
+            ignoreIllegals: true,
+          }).value;
+        } catch {}
+      });
       refresh();
     })
     .catch(() => {});

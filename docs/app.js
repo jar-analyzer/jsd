@@ -1,3 +1,4 @@
+import { setupWelcome } from './welcome.js';
 import { setupFind } from './editor-find.js';
 import { setupQuickOpen } from './quick-open.js';
 import { showExplorer } from './layout.js';
@@ -258,6 +259,7 @@ document.querySelectorAll('#langSwitch button').forEach((button) =>
     refresh();
   }),
 );
+setupWelcome();
 applyStatic();
 refresh();
 loadHighlighter(() => {

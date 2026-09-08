@@ -1,0 +1,346 @@
+.icon-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.ui-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#welcome {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  padding: 40px clamp(24px, 5vw, 72px) 32px;
+  scrollbar-width: thin;
+  scrollbar-color: #424242 transparent;
+  container-type: inline-size;
+}
+#welcome > * {
+  max-width: 920px;
+  margin-inline: auto;
+}
+.welcome-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  color: #e7e7e7;
+  font-size: 24px;
+  font-weight: 600;
+}
+.welcome-brand > .ui-icon {
+  width: 32px;
+  height: 32px;
+  color: #75beff;
+}
+.version-badge {
+  padding: 2px 8px;
+  border: 1px solid #414141;
+  border-radius: 4px;
+  color: #a9b2bc;
+  font:
+    11px/1.6 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+#welcome h1 {
+  margin-bottom: 12px;
+  font-size: clamp(25px, 2.6vw, 34px);
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  color: #ededed;
+}
+#welcome p {
+  color: #a5aab1;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 22px;
+}
+.welcome-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  background: #0e639c;
+  color: white;
+}
+.welcome-open:hover:not(:disabled) {
+  background: #1177bb;
+}
+.welcome-formats {
+  font:
+    12px/1.7 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  color: #8e98a3;
+}
+#welcome .library-info {
+  margin-top: 28px;
+  border: 1px solid #383b40;
+  border-radius: 6px;
+  background: #232427;
+  overflow: hidden;
+}
+.library-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  border-bottom: 1px solid #34373b;
+  font:
+    12px/1.6 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.js-file-icon {
+  color: #e8cf77;
+  font-size: 11px;
+  font-weight: 700;
+}
+.library-format {
+  margin-left: auto;
+  color: #929aa4;
+  font-size: 11px;
+}
+.library-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 22px 0 16px;
+}
+.library-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 24px;
+}
+.library-metrics > div + div {
+  border-left: 1px solid #383b40;
+}
+.library-metrics span,
+.library-metrics small {
+  color: #a5aab1;
+  font-size: 12px;
+  font-weight: 400;
+}
+.library-metrics strong {
+  color: #e4edf8;
+  font-size: 30px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+}
+.library-metrics strong small {
+  color: #8fc9ff;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+#welcome .library-caption {
+  padding: 0 24px 20px;
+  font-size: 12px;
+}
+.project-link {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #34373b;
+  color: #b9c0c9;
+  text-decoration: none;
+  font-size: 12px;
+}
+.project-link:hover {
+  background: #ffffff06;
+  color: #fff;
+}
+.project-address {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: #8fc9ff;
+  overflow-wrap: anywhere;
+}
+#welcome .usage-section {
+  margin-top: 32px;
+}
+.usage-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.usage-heading h2 {
+  color: #e4e7eb;
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.usage-heading a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b6bdc6;
+  font-size: 12px;
+  text-decoration: none;
+}
+.usage-heading a:hover {
+  color: #8fc9ff;
+}
+.usage-heading a span {
+  color: #929aa4;
+}
+.usage-tabs {
+  display: flex;
+  margin-top: 20px;
+  border: 1px solid #383b40;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: #252526;
+  overflow: hidden;
+}
+.usage-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 12px 22px;
+  border: 0;
+  border-top: 2px solid transparent;
+  border-right: 1px solid #383b40;
+  border-radius: 0;
+  color: #999fa8;
+  font-size: 13px;
+}
+.usage-tabs button[aria-selected='true'] {
+  border-top-color: #75beff;
+  background: #1b1d20;
+  color: #edf2f8;
+}
+.usage-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #383b40;
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: #1b1d20;
+}
+.example-code {
+  margin-top: 16px;
+  border: 1px solid #34373b;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.example-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid #303338;
+  background: #25272b;
+  color: #a9b2bc;
+  font:
+    12px/1.6 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.example-toolbar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.example-toolbar button {
+  display: flex;
+  padding: 4px;
+  color: #a9b2bc;
+}
+.example-code pre {
+  padding: 18px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  background: #191b1e;
+  color: #d4d4d4;
+  font:
+    12px/1.85 'SFMono-Regular',
+    Consolas,
+    'Liberation Mono',
+    Menlo,
+    monospace;
+  tab-size: 2;
+}
+.example-code code {
+  font: inherit;
+}
+.example-code .hljs-tag,
+.example-code .hljs-name {
+  color: #569cd6;
+}
+.example-code .hljs-attr {
+  color: #9cdcfe;
+}
+#welcome #exampleCopyStatus {
+  min-height: 24px;
+  margin-top: 8px;
+  color: #89d185;
+  font-size: 12px;
+}
+@container (max-width: 480px) {
+  .library-metrics > div {
+    padding-inline: 12px;
+  }
+  .library-metrics strong {
+    font-size: 22px;
+  }
+  .library-metrics span,
+  .library-metrics small {
+    font-size: 11px;
+  }
+  .library-heading,
+  .project-link {
+    padding-inline: 14px;
+  }
+  #welcome .library-caption {
+    padding-inline: 14px;
+  }
+  .project-address {
+    width: 100%;
+    margin-left: 0;
+  }
+  .usage-panel {
+    padding: 14px;
+  }
+  .usage-tabs button {
+    flex: 1;
+    padding-inline: 14px;
+  }
+}
+@media (max-width: 700px) {
+  #welcome {
+    padding: 28px 20px 20px;
+  }
+}
