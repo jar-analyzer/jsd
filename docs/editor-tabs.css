@@ -1,0 +1,88 @@
+#editorTabs {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 37px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #252526;
+  border-bottom: 1px solid #303031;
+  scrollbar-width: thin;
+  scrollbar-color: #555 transparent;
+}
+.editor-tab {
+  display: flex;
+  align-items: center;
+  flex: none;
+  max-width: 240px;
+  border-right: 1px solid #1e1e1e;
+  border-top: 1px solid transparent;
+  color: #969696;
+  background: #2d2d2d;
+}
+.editor-tab.active {
+  border-top-color: #75beff;
+  background: #1e1e1e;
+  color: #fff;
+}
+.editor-tab [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px 0 12px;
+  border: 0;
+  color: inherit;
+  font-size: 12px;
+}
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-class-icon {
+  flex: none;
+  color: #e7b36b;
+  font:
+    12px/1 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.tab-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 18px;
+  color: inherit;
+}
+#tabContextMenu {
+  position: fixed;
+  z-index: 20;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid #454545;
+  border-radius: 5px;
+  background: #252526;
+  box-shadow: 0 5px 18px #0008;
+}
+#tabContextMenu button {
+  display: block;
+  width: 100%;
+  padding: 5px 18px;
+  text-align: left;
+  font-size: 12px;
+}
+#tabContextMenu button:hover:not(:disabled),
+#tabContextMenu button:focus-visible {
+  background: #094771;
+  outline: none;
+}
+#tabContextMenu button:last-child {
+  border-top: 1px solid #454545;
+  margin-top: 4px;
+}

@@ -2,6 +2,7 @@
 @import url('./editor.css');
 @import url('./search.css');
 @import url('./welcome.css');
+@import url('./editor-tabs.css');
 
 :root {
   color-scheme: dark;

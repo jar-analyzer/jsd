@@ -99,3 +99,102 @@ test('a failed report without sources keeps its diagnostic status', async () => 
   assert.equal(result.status, 'failed');
   assert.equal(result.diagnostics[0].message, 'parse failed');
 });
+
+test('tabs keep insertion order, deduplicate selections and switch using cached source', async () => {
+  const state = new Workspace();
+  state.replace(['A', 'B', 'C'].map((name) => [`${name}.class`, bytes]));
+  for (const name of ['A', 'B', 'C', 'A']) {
+    await state.select(`${name}.class`, async () => report(name));
+  }
+  assert.deepEqual(state.tabs, ['A.class', 'B.class', 'C.class']);
+  state.closeTabs('B.class');
+  assert.equal(state.currentPath, 'A.class');
+  state.closeTabs('A.class');
+  assert.equal(state.currentPath, 'C.class');
+  assert.equal(state.current.source, 'class C {}');
+  assert.equal(state.selected, 'C.class');
+});
+
+test('batch tab closes use the clicked tab and preserve or replace the active tab correctly', async () => {
+  for (const [mode, expected, active] of [
+    ['left', ['C.class', 'D.class'], 'C.class'],
+    ['right', ['A.class', 'B.class', 'C.class'], 'A.class'],
+    ['others', ['C.class'], 'C.class'],
+    ['all', [], null],
+  ] as const) {
+    const state = new Workspace();
+    state.replace(['A', 'B', 'C', 'D'].map((name) => [`${name}.class`, bytes]));
+    for (const name of ['A', 'B', 'C', 'D', 'A'])
+      await state.select(`${name}.class`, async () => report(name));
+    state.closeTabs('C.class', mode);
+    assert.deepEqual(state.tabs, expected);
+    assert.equal(state.currentPath, active);
+    assert.equal(state.selected, active);
+    if (!active) assert.equal(state.current, null);
+  }
+});
+
+test('closing all tabs prevents a pending decompilation from reopening an editor', async () => {
+  const state = new Workspace();
+  state.replace([
+    ['A.class', bytes],
+    ['B.class', bytes],
+  ]);
+  await state.select('A.class', async () => report('A'));
+  const pending = deferred();
+  const selection = state.select('B.class', () => pending.promise);
+  state.closeTabs('A.class', 'all');
+  pending.resolve(report('B'));
+  assert.equal(await selection, null);
+  assert.deepEqual(state.tabs, []);
+  assert.equal(state.current, null);
+  assert.equal(state.selected, null);
+  assert.equal(state.files.size, 2);
+  await state.select('B.class', async () => {
+    throw new Error('cache miss');
+  });
+  assert.deepEqual(state.tabs, ['B.class']);
+});
+
+test('adding files preserves open tabs and rejects duplicates atomically', async () => {
+  const state = new Workspace();
+  state.replace([['A.class', bytes]]);
+  await state.select('A.class', async () => report('A'));
+  state.add([['B.class', bytes]]);
+  assert.deepEqual(state.tabs, ['A.class']);
+  assert.equal(state.current.name, 'A');
+  assert.throws(
+    () =>
+      state.add([
+        ['C.class', bytes],
+        ['A.class', bytes],
+      ]),
+    /DUPLICATE/,
+  );
+  assert.equal(state.files.has('C.class'), false);
+  state.replace([]);
+  assert.deepEqual(state.tabs, []);
+});
+
+test('adding family members refreshes cached decompilation without losing open editors', async () => {
+  const state = new Workspace();
+  state.replace([
+    ['Outer$Inner.class', bytes],
+    ['B.class', bytes],
+  ]);
+  await state.select('Outer$Inner.class', async () => report('Inner'));
+  await state.select('B.class', async () => report('B'));
+  state.add([['Outer.class', bytes]]);
+  state.closeTabs('B.class');
+  assert.equal(state.current.name, 'Inner');
+  await state.select('Outer$Inner.class', async (files) => {
+    assert.equal(files.length, 2);
+    return report('Outer');
+  });
+  state.add([['Outer$Other.class', bytes]]);
+  await state.select('Outer.class', async (files) => {
+    assert.equal(files.length, 3);
+    return report('OuterWithOther');
+  });
+  assert.equal(state.current.name, 'OuterWithOther');
+});

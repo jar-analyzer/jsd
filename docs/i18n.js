@@ -1,5 +1,13 @@
 const dict = {
   en: {
+    openEditors: 'Open editors',
+    tabActions: 'Tab actions',
+    closeTab: 'Close',
+    closeOtherTabs: 'Close Others',
+    closeLeftTabs: 'Close to the Left',
+    closeRightTabs: 'Close to the Right',
+    closeAllTabs: 'Close All',
+
     quickOpen: 'Go to file…',
     quickHint: 'Search files by name or path…',
     quickKeys: '↑↓ navigate · Enter open · Esc close',
@@ -82,6 +90,14 @@ const dict = {
     copied: 'Copied',
   },
   zh: {
+    openEditors: '已打开的编辑器',
+    tabActions: '标签页操作',
+    closeTab: '关闭',
+    closeOtherTabs: '关闭其他标签页',
+    closeLeftTabs: '关闭左侧标签页',
+    closeRightTabs: '关闭右侧标签页',
+    closeAllTabs: '关闭全部标签页',
+
     quickOpen: '转到文件…',
     quickHint: '搜索文件名或路径…',
     quickKeys: '↑↓ 选择 · Enter 打开 · Esc 关闭',

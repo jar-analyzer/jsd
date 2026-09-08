@@ -119,6 +119,7 @@
         aria-valuenow="280"
       ></div>
       <section id="viewer" aria-busy="false">
+        <div id="editorTabs" role="tablist" data-i18n-aria="openEditors" hidden></div>
         <div id="viewerBar">
           <span id="barText" data-i18n="pickClass">Select a class file</span>
           <span class="spacer"></span>
@@ -403,6 +404,19 @@ console.log(result.source);</code></pre>
         >GitHub ↗</a
       >
     </footer>
+    <div id="tabContextMenu" role="menu" data-i18n-aria="tabActions" hidden>
+      <button role="menuitem" data-close-tabs="current" data-i18n="closeTab">Close</button>
+      <button role="menuitem" data-close-tabs="others" data-i18n="closeOtherTabs">
+        Close Others
+      </button>
+      <button role="menuitem" data-close-tabs="left" data-i18n="closeLeftTabs">
+        Close to the Left
+      </button>
+      <button role="menuitem" data-close-tabs="right" data-i18n="closeRightTabs">
+        Close to the Right
+      </button>
+      <button role="menuitem" data-close-tabs="all" data-i18n="closeAllTabs">Close All</button>
+    </div>
     <dialog id="quickOpen" data-i18n-aria="quickOpen">
       <div class="quick-header">
         <input

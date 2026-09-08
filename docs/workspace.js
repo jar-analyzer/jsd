@@ -23,12 +23,15 @@ export function classFamily(files, path) {
 export class Workspace {
   files = new Map();
   cache = new Map();
+  cacheInputs = new Map();
+  tabResults = new Map();
   current = null;
   selected = null;
   currentPath = null;
   revision = 0;
   selection = 0;
   archives = new Set();
+  tabs = [];
 
   async expandArchive(path, extract) {
     if (this.archives.has(path)) return false;
@@ -47,9 +50,46 @@ export class Workspace {
     return true;
   }
 
+  add(entries) {
+    const names = new Set(this.files.keys());
+    for (const [name] of entries) {
+      if (names.has(name)) throw new Error(`DUPLICATE: ${name}`);
+      names.add(name);
+    }
+    for (const [name, bytes] of entries) this.files.set(name, bytes);
+  }
+
+  closeTabs(path, mode = 'current') {
+    const index = this.tabs.indexOf(path);
+    if (index < 0 && mode !== 'all') return;
+    this.cancel();
+    const previousTabs = this.tabs;
+    const activeIndex = previousTabs.indexOf(this.currentPath);
+    this.tabs = this.tabs.filter((name, i) => {
+      if (mode === 'all') return false;
+      if (mode === 'left') return i >= index;
+      if (mode === 'right') return i <= index;
+      if (mode === 'others') return name === path;
+      return name !== path;
+    });
+    for (const name of this.tabResults.keys()) {
+      if (!this.tabs.includes(name)) this.tabResults.delete(name);
+    }
+    if (this.tabs.includes(this.currentPath)) return;
+    this.currentPath =
+      previousTabs.slice(activeIndex + 1).find((name) => this.tabs.includes(name)) ??
+      this.tabs.at(-1) ??
+      null;
+    this.selected = this.currentPath;
+    this.current = this.currentPath ? (this.tabResults.get(this.currentPath) ?? null) : null;
+  }
+
   replace(entries) {
     this.files = new Map(entries);
     this.cache.clear();
+    this.cacheInputs.clear();
+    this.tabResults.clear();
+    this.tabs = [];
     this.archives.clear();
     this.current = null;
     this.selected = null;
@@ -69,6 +109,17 @@ export class Workspace {
     this.selected = path;
     const family = classFamily(this.files, path);
     let result = this.cache.get(family.root);
+    const inputs = this.cacheInputs.get(family.root);
+    if (
+      !inputs ||
+      inputs.length !== family.files.length ||
+      inputs.some(
+        ([name, bytes], index) =>
+          name !== family.files[index][0] || bytes !== family.files[index][1],
+      )
+    ) {
+      result = null;
+    }
     if (!result) {
       const start = performance.now();
       let report;
@@ -90,8 +141,11 @@ export class Workspace {
         ms: performance.now() - start,
       };
       this.cache.set(family.root, result);
+      this.cacheInputs.set(family.root, family.files);
     }
     if (ticket !== this.selection) return null;
+    if (!this.tabs.includes(path)) this.tabs.push(path);
+    this.tabResults.set(path, result);
     this.current = result;
     this.currentPath = path;
     return result;

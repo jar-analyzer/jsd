@@ -1,3 +1,4 @@
+import { setupEditorTabs } from './editor-tabs.js';
 import { setupWelcome } from './welcome.js';
 import { setupFind } from './editor-find.js';
 import { setupQuickOpen } from './quick-open.js';
@@ -24,6 +25,32 @@ setupQuickOpen(
 const $ = (id) => document.getElementById(id);
 let task = 0;
 let loadingKey = null;
+const positions = new Map();
+const editorTabs = setupEditorTabs(workspace, selectClass, closeTabs);
+
+function savePosition() {
+  if (workspace.currentPath)
+    positions.set(workspace.currentPath, {
+      top: $('codeWrap').scrollTop,
+      left: $('codeWrap').scrollLeft,
+    });
+}
+
+function restorePosition() {
+  const position = positions.get(workspace.currentPath);
+  $('codeWrap').scrollTop = position?.top ?? 0;
+  $('codeWrap').scrollLeft = position?.left ?? 0;
+}
+
+function closeTabs(path, mode) {
+  savePosition();
+  cancel();
+  workspace.closeTabs(path, mode);
+  for (const name of positions.keys()) if (!workspace.tabs.includes(name)) positions.delete(name);
+  refresh();
+  restorePosition();
+  if (workspace.currentPath) revealTreePath(workspace.currentPath);
+}
 
 function buildTree(files, selected, filter = '') {
   drawTree(files, selected, filter, workspace.archives);
@@ -49,6 +76,7 @@ function refresh() {
   $('statCache').textContent = workspace.cache.size ? t('cached', { n: workspace.cache.size }) : '';
   buildTree(workspace.files, workspace.selected, $('search').value.trim().toLowerCase());
   renderSource(workspace.current);
+  editorTabs.refresh();
   finder.refresh();
   busy(loadingKey);
 }
@@ -64,6 +92,7 @@ async function selectClass(path) {
   const archive = /\.(jar|war|zip)$/i.test(path);
   if (archive && workspace.archives.has(path)) return;
   if (workspace.currentPath === path && !loadingKey) return;
+  savePosition();
   const token = ++task;
   engine.cancel();
   flash('');
@@ -84,8 +113,8 @@ async function selectClass(path) {
     const result = await pending;
     if (token !== task || !result) return;
     refresh();
-    $('codeWrap').scrollTop = 0;
-    $('codeWrap').scrollLeft = 0;
+    restorePosition();
+    revealTreePath(path);
   } catch (error) {
     if (token === task && error.name !== 'AbortError') flash(errorText(error), true);
   } finally {
@@ -107,7 +136,7 @@ async function loadFiles(read) {
     if (token !== task) return;
     const entries = await engine.run('load', { inputs });
     if (token !== task) return;
-    workspace.replace(entries);
+    workspace.add(entries);
     $('search').value = '';
     refresh();
     const classes = entries.filter(([path]) => /\.class$/i.test(path));
@@ -151,6 +180,7 @@ $('btnCancel').addEventListener('click', () => {
 $('btnClear').addEventListener('click', () => {
   cancel();
   workspace.replace([]);
+  positions.clear();
   $('search').value = '';
   flash('');
   refresh();
