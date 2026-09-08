@@ -1,3 +1,4 @@
+import type { SwitchLabel } from '../simulate/result.js';
 import { attemptRecognition } from './recognition.js';
 import { Expr, Stmt } from '../../ast/ast.js';
 import type { ClassFile } from '../../classfile/model.js';
@@ -58,7 +59,7 @@ export const switchPart: ThisType<Structurer> &
       return es.next;
     }
 
-    let patCaseTypes: string[] | null = null;
+    let patCaseTypes: SwitchLabel[] | null = null;
     for (const ins of this.cfg.blocks[b].instrs) {
       if (ins.op === 0xba) {
         const ct = this.sim.switchCaseTypes?.get(ins.pc);
@@ -133,7 +134,7 @@ export const switchPart: ThisType<Structurer> &
       const g = groups[gi];
       const later = new Set(caseTargets.slice(gi + 1));
       let bindName: string | null = null;
-      if (patMode) {
+      if (caseTypes?.[g.value]?.kind === 'type') {
         const st = this.sim.stmts[g.target];
         if (
           st.length &&
@@ -158,9 +159,18 @@ export const switchPart: ThisType<Structurer> &
       );
       let labels: (number | string)[];
       if (patMode && caseTypes) {
-        const tn = caseTypes[g.value as number];
-        const disp = tn ? tn.replace(/\//g, '.').replace(/\$/g, '.') : `case${g.value}`;
-        labels = [bindName ? `${disp} ${bindName}` : disp];
+        labels = ordered
+          .filter((entry) => entry.target === g.target)
+          .map((entry) => {
+            if (entry.value === -1) return 'null';
+            const label = caseTypes[entry.value as number];
+            if (!label) throw new Error(`Invalid dynamic switch label index ${entry.value}`);
+            if (label.kind === 'constant') return label.text;
+            const display = label.text.replace(/\//g, '.').replace(/\$/g, '.');
+            if (!bindName)
+              throw new Error('Dynamic type switch has no recoverable pattern binding');
+            return `${display} ${bindName}`;
+          });
       } else {
         labels = [g.value];
         for (const c of ordered) {
@@ -415,7 +425,7 @@ export const switchPart: ThisType<Structurer> &
     if (!valueToConst || valueToConst.size === 0) return null;
 
     const term = this.t(b) as { t: 'switch'; cases: { value: number | null; target: number }[] };
-    let patCaseTypes: string[] | null = null;
+    let patCaseTypes: SwitchLabel[] | null = null;
     for (const ins of this.cfg.blocks[b].instrs) {
       if (ins.op === 0xba) {
         const ct = this.sim.switchCaseTypes?.get(ins.pc);

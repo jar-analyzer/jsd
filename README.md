@@ -11,9 +11,9 @@
 
 A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers as a single ESM bundle, with no runtime dependencies or WebAssembly.
 
-**Small enough to drop straight into your page: just one ~196 KB JavaScript file (~59 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
+**Small enough to drop straight into your page: just one ~208 KB JavaScript file (~63 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
 
-Size measured from the current minified `dist/jsd.min.js` bundle (~196 KB (0.196 MB) before gzip; ~59 KB (0.059 MB) after gzip).
+Size measured from the current minified `dist/jsd.min.js` bundle (~208 KB (0.208 MB) before gzip; ~63 KB (0.063 MB) after gzip).
 
 [Try the live demo](https://jar-analyzer.github.io/jsd/)
 

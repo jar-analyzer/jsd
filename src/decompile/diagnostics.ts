@@ -9,7 +9,9 @@ export type DiagnosticCode =
   | 'METHOD_DECOMPILE_FAILED'
   | 'ANONYMOUS_METHOD_RENDER_FAILED'
   | 'LAMBDA_DECOMPILE_FAILED'
-  | 'UNSUPPORTED_INVOKEDYNAMIC';
+  | 'UNSUPPORTED_INVOKEDYNAMIC'
+  | 'UNSUPPORTED_CONSTANT'
+  | 'INVALID_BOOTSTRAP';
 
 export interface DecompileDiagnostic {
   code: DiagnosticCode;

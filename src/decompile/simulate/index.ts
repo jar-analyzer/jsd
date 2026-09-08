@@ -350,7 +350,7 @@ export interface Simulator {
     isSuper: boolean,
   ): void;
   classTypeAt(idx: number): JType;
-  pushLoadConst(idx: number, stack: ExprStack, wide2?: boolean): void;
+  pushLoadConst(idx: number, stack: ExprStack, wide2?: boolean, pc?: number): void;
   localExpr(slot: number, pc: number): import('../../ast/ast.js').Expr;
   assignLocal(slot: number, v: import('../../ast/ast.js').Expr, pc: number): Stmt;
   buildNew(
@@ -371,9 +371,6 @@ export interface Simulator {
     len: import('../../ast/ast.js').Expr,
   ): { expr: import('../../ast/ast.js').Expr } | null;
   execInvokeDynamic(ins: Instr, stack: ExprStack, stmts: Stmt[]): void;
-  bootstrapConstToExpr(
-    c: { kind: string; value?: unknown } | undefined,
-  ): import('../../ast/ast.js').Expr;
   buildCond(ins: Instr, stack: ExprStack): import('../../ast/ast.js').Expr;
   isBooleanish(e: import('../../ast/ast.js').Expr): boolean;
 }

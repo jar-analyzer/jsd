@@ -13,7 +13,18 @@ public class ModernJdk21 {
     };
   }
 
+  static int stateCode(Thread.State state) {
+    return switch (state) {
+      case null -> -1;
+      case NEW -> 0;
+      default -> 1;
+    };
+  }
+
   public static void main(String[] args) {
+    System.out.println(
+      stateCode(null) + ":" + stateCode(Thread.State.NEW) + ":" + stateCode(Thread.State.RUNNABLE)
+    );
     System.out.println((int) area(new Circle(2)) + " " + (int) area(new Rect(3, 4)));
   }
 }

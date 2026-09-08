@@ -33,7 +33,7 @@ export type Expr =
       args: Expr[];
       superCall?: boolean;
       erasedLambda?: boolean;
-      bootstrap?: { name: string; index: number };
+      bootstrap?: { name: string; index: number; interfaces?: string[] };
     }
   | { kind: 'new'; owner: string; descriptor?: string; args: Expr[]; outer?: Expr }
   | { kind: 'new-array'; elemType: JType; dimsExprs: Expr[]; dims: number; jtype?: JType }

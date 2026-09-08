@@ -31,6 +31,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node test/run-e2e.mjs
+      - run: node test/run-dynamic.mjs
+        if: matrix.java != '8'
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

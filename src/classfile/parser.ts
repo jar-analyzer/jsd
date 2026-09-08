@@ -155,7 +155,7 @@ function parseBootstrapArg(rd: ByteReader, cp: ConstantPool): BootstrapArg {
     case 'methodtype':
       return { kind: 'methodType', descriptor: cv.value as string };
     case 'dynamic':
-      return { kind: 'string', value: String(cv.value) };
+      return { kind: 'dynamic', index: idx, ...cp.dynamic(idx) };
     default:
       throw new Error(`unsupported bootstrap arg type ${cv.type}`);
   }

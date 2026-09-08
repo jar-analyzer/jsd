@@ -11,9 +11,9 @@
 
 TypeScript 实现的 Java `.class` 反编译库。以单个 ESM 产物运行于 Node.js 和浏览器，无运行时依赖，无 WebAssembly。
 
-**轻量接入：仅需引入一个约 196 KB 的 JS 文件（gzip 后约 59 KB），即可反编译 Java `.class` 文件。** 零运行时依赖，无需 WebAssembly，无需安装 Java。
+**轻量接入：仅需引入一个约 208 KB 的 JS 文件（gzip 后约 63 KB），即可反编译 Java `.class` 文件。** 零运行时依赖，无需 WebAssembly，无需安装 Java。
 
-体积基于当前压缩后的 `dist/jsd.min.js` 实测：gzip 前约 196 KB（0.196 MB），gzip 后约 59 KB（0.059 MB）。
+体积基于当前压缩后的 `dist/jsd.min.js` 实测：gzip 前约 208 KB（0.208 MB），gzip 后约 63 KB（0.063 MB）。
 
 [在线体验](https://jar-analyzer.github.io/jsd/)
 

@@ -153,9 +153,9 @@ test('unsupported invokedynamic is reported with its bytecode offset', () => {
   const report = d.decompileAllDetailed();
   assert.equal(report.status, 'partial');
   assert.equal(report.sources[0].status, 'partial');
-  assert.equal(report.diagnostics.length, 1);
-  assert.equal(report.diagnostics[0].code, 'UNSUPPORTED_INVOKEDYNAMIC');
-  assert.equal(report.diagnostics[0].bytecodeOffset, 0);
+  const diagnostic = report.diagnostics.find((d) => d.code === 'UNSUPPORTED_INVOKEDYNAMIC');
+  assert.equal(diagnostic?.bytecodeOffset, 0);
+  assert.match(report.sources[0].source, /decompilation failed/);
 });
 
 test('cyclic inner-class metadata cannot silently disappear beside a healthy class', () => {

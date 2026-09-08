@@ -1,3 +1,4 @@
+import './dynamic-bytecode.test.js';
 import './discard-locals.test.js';
 import './demo-search.test.js';
 import './demo-tree.test.js';

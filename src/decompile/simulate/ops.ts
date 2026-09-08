@@ -1,3 +1,10 @@
+import {
+  bootstrapConstant,
+  dynamicConstant,
+  methodTypeExpression,
+  ConstantResolutionError,
+} from './constants.js';
+import { errorMessage } from '../diagnostics.js';
 import { discardOperands } from './discard.js';
 import { canConcatenateBuilder, concatAppendArgument } from './string-builder.js';
 import { expressionType } from '../../ast/types.js';
@@ -75,11 +82,11 @@ export const opsPart: ThisType<Simulator> &
       return;
     }
     if (op === 0x12 || op === 0x13) {
-      this.pushLoadConst(ins.cpIndex!, stack);
+      this.pushLoadConst(ins.cpIndex!, stack, false, ins.pc);
       return;
     }
     if (op === 0x14) {
-      this.pushLoadConst(ins.cpIndex!, stack, true);
+      this.pushLoadConst(ins.cpIndex!, stack, true, ins.pc);
       return;
     }
     if (
@@ -574,33 +581,66 @@ export const opsPart: ThisType<Simulator> &
     return { kind: 'class', name };
   },
 
-  pushLoadConst(idx: number, stack: ExprStack, wide2 = false): void {
-    const cv = this.cls.cp.constVal(idx);
-    switch (cv.type) {
-      case 'int':
-        stack.push({ kind: 'const', ctype: 'int', value: cv.value as number });
-        break;
-      case 'float':
-        stack.push({ kind: 'const', ctype: 'float', value: cv.value as number });
-        break;
-      case 'long':
-        stack.push({ kind: 'const', ctype: 'long', value: cv.value as bigint }, true);
-        break;
-      case 'double':
-        stack.push({ kind: 'const', ctype: 'double', value: cv.value as number }, true);
-        break;
-      case 'string':
-        stack.push({ kind: 'const', ctype: 'string', value: cv.value as string });
-        break;
-      case 'class':
-        stack.push({ kind: 'class-literal', jtype: this.classTypeAt(idx) });
-        break;
-      case 'methodtype':
-        throw new SimFail('method type constants are not supported');
-      case 'methodhandle':
-        throw new SimFail('method handle constants are not supported');
-      default:
-        throw new SimFail(`constant type ${cv.type} is not supported`);
+  pushLoadConst(idx: number, stack: ExprStack, wide2 = false, pc?: number): void {
+    try {
+      const cv = this.cls.cp.constVal(idx);
+      const descriptor =
+        cv.type === 'dynamic' ? this.cls.cp.dynamic(idx, 'constant').descriptor : '';
+      const wide =
+        cv.type === 'long' || cv.type === 'double' || descriptor === 'J' || descriptor === 'D';
+      if (wide !== wide2)
+        throw new ConstantResolutionError(
+          `Invalid ldc width for ${cv.type} at cp[${idx}]`,
+          'INVALID_BOOTSTRAP',
+        );
+      switch (cv.type) {
+        case 'int':
+          stack.push({ kind: 'const', ctype: 'int', value: cv.value as number });
+          break;
+        case 'float':
+          stack.push({ kind: 'const', ctype: 'float', value: cv.value as number });
+          break;
+        case 'long':
+          stack.push({ kind: 'const', ctype: 'long', value: cv.value as bigint }, true);
+          break;
+        case 'double':
+          stack.push({ kind: 'const', ctype: 'double', value: cv.value as number }, true);
+          break;
+        case 'string':
+          stack.push({ kind: 'const', ctype: 'string', value: cv.value as string });
+          break;
+        case 'class':
+          stack.push({ kind: 'class-literal', jtype: this.classTypeAt(idx) });
+          break;
+        case 'methodtype':
+          stack.push(methodTypeExpression(this.cls.cp.methodType(idx)));
+          break;
+        case 'methodhandle':
+          stack.push(
+            bootstrapConstant(this.cls, {
+              kind: 'methodHandle',
+              handle: this.cls.cp.methodHandle(idx),
+            }),
+          );
+          break;
+        case 'dynamic':
+          stack.push(dynamicConstant(this.cls, idx), wide);
+          break;
+        default:
+          throw new SimFail(`constant type ${cv.type} is not supported`);
+      }
+    } catch (error) {
+      this.ctx.diagnostics.add({
+        code: error instanceof ConstantResolutionError ? error.code : 'UNSUPPORTED_CONSTANT',
+        severity: 'error',
+        stage: 'simulate',
+        className: this.cls.name,
+        methodName: this.method.name,
+        descriptor: this.method.descriptor,
+        bytecodeOffset: pc,
+        message: errorMessage(error),
+      });
+      throw new SimFail(errorMessage(error));
     }
   },
 

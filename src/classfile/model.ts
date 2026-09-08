@@ -71,10 +71,12 @@ export interface MemberRef {
 
 export interface MethodHandleRef {
   kind: number;
+  referenceTag?: 9 | 10 | 11;
   ref: MemberRef;
 }
 
 export type BootstrapArg =
+  | { kind: 'dynamic'; index: number; bsm: number; name: string; descriptor: string }
   | { kind: 'methodType'; descriptor: string }
   | { kind: 'methodHandle'; handle: MethodHandleRef }
   | { kind: 'type'; typeName: string }

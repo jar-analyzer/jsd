@@ -146,22 +146,44 @@ export class ConstantPool {
   memberRef(i: number): MemberRef {
     const x = this.e(i) as { tag: 9 | 10 | 11; classIdx: number; natIdx: number };
     if (x.tag !== 9 && x.tag !== 10 && x.tag !== 11) throw new Error(`cp[${i}] is not a ref`);
+    if (this.e(x.classIdx).tag !== 7) throw new Error(`cp[${i}] member owner is not Class`);
     const nat = this.nat(x.natIdx);
     return { owner: this.className(x.classIdx), name: nat.name, descriptor: nat.descriptor };
   }
   methodHandle(i: number): MethodHandleRef {
     const x = this.e(i);
     if (x.tag !== 15) throw new Error(`cp[${i}] is not MethodHandle`);
-    return { kind: x.kind, ref: this.memberRef(x.refIdx) };
+    const target = this.e(x.refIdx);
+    const valid =
+      x.kind >= 1 && x.kind <= 4
+        ? target.tag === 9
+        : x.kind === 5 || x.kind === 8
+          ? target.tag === 10
+          : x.kind === 6 || x.kind === 7
+            ? target.tag === 10 || target.tag === 11
+            : x.kind === 9 && target.tag === 11;
+    if (!valid) throw new Error(`invalid method handle kind/reference at cp[${i}]`);
+    const ref = this.memberRef(x.refIdx);
+    if (
+      x.kind >= 5 &&
+      (x.kind === 8 ? ref.name !== '<init>' : ref.name === '<init>' || ref.name === '<clinit>')
+    )
+      throw new Error(`invalid method handle member name at cp[${i}]`);
+    return { kind: x.kind, referenceTag: target.tag as 9 | 10 | 11, ref };
   }
   methodType(i: number): string {
     const x = this.e(i);
     if (x.tag !== 16) throw new Error(`cp[${i}] is not MethodType`);
     return this.utf8(x.descIdx);
   }
-  dynamic(i: number): { bsm: number; name: string; descriptor: string } {
+  dynamic(
+    i: number,
+    expected?: 'constant' | 'callsite',
+  ): { bsm: number; name: string; descriptor: string } {
     const x = this.e(i) as { tag: 17 | 18; bsmIdx: number; natIdx: number };
     if (x.tag !== 17 && x.tag !== 18) throw new Error(`cp[${i}] is not Dynamic`);
+    if (expected && x.tag !== (expected === 'constant' ? 17 : 18))
+      throw new Error(`cp[${i}] has the wrong dynamic constant kind`);
     const nat = this.nat(x.natIdx);
     return { bsm: x.bsmIdx, name: nat.name, descriptor: nat.descriptor };
   }

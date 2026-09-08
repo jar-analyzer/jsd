@@ -13,13 +13,15 @@ export type Terminator =
   | { t: 'throw'; expr: import('../../ast/ast.js').Expr }
   | { t: 'athrow' };
 
+export type SwitchLabel = { kind: 'type' | 'constant'; text: string };
+
 export interface SimResult {
   stmts: Stmt[][];
   terms: Terminator[];
   entryStack: ExprStack[];
   slotAssignPc: Map<number, number[]>;
   switchSubjects: Map<number, import('../../ast/ast.js').Expr>;
-  switchCaseTypes: Map<number, string[]>;
+  switchCaseTypes: Map<number, SwitchLabel[]>;
   nextTempSlot: number;
   failed?: string;
 }

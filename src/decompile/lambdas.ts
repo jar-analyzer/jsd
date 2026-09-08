@@ -4,9 +4,20 @@ import type { ClassFile, MemberRef, MethodHandleRef, MethodInfo } from '../class
 import { parseMethodDescriptor } from '../classfile/types.js';
 import type { Ctx } from './context.js';
 import { decompileMethod } from './method.js';
-import { RenderCtx, exprStr } from './printer/index.js';
+import { RenderCtx, exprStr, typeStr } from './printer/index.js';
 
 export function resolveLambda(e: Expr, rc: RenderCtx): string | null {
+  if (e.kind !== 'invoke' || !e.bootstrap?.interfaces?.length) return resolveLambdaBody(e, rc);
+  const body = resolveLambdaBody({ ...e, erasedLambda: true }, rc);
+  if (body === null) return null;
+  const types = [
+    parseMethodDescriptor(e.descriptor).ret,
+    ...e.bootstrap.interfaces.map((name) => ({ kind: 'class' as const, name })),
+  ];
+  return `(${types.map((t) => typeStr(t, rc)).join(' & ')}) (${body})`;
+}
+
+function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
   if (e.kind !== 'invoke') return null;
   const marker = e.bootstrap;
   if (!marker) return null;
@@ -36,7 +47,7 @@ export function resolveLambda(e: Expr, rc: RenderCtx): string | null {
 
   if (!ref.name.startsWith('lambda$')) {
     if (e.erasedLambda && bm.args[0]?.kind === 'methodType') {
-      const instantiated = bm.args.filter((a) => a.kind === 'methodType').at(-1);
+      const instantiated = bm.args[2];
       if (instantiated?.kind === 'methodType')
         return erasedMethodReference(
           handle,
