@@ -205,7 +205,37 @@ export class Simulator {
     this.lastLoad = null;
     this.pendingPrefix = null;
     const b = this.cfg.blocks[id];
+    this.ctx.budget.check(b.instrs.length);
     const stack = this.entryStack[id].clone();
+    const frame = this.method.code?.stackMapFrames?.find((f) => f.offset === b.startPc);
+    if (
+      frame &&
+      (frame.stack.length !== stack.depth ||
+        frame.stack.some((t, i) => (t.tag === 3 || t.tag === 4) !== stack.items[i].w))
+    )
+      throw new SimFail(`Operand stack disagrees with StackMapTable at ${b.startPc}`);
+    if (frame)
+      for (let i = 0; i < frame.stack.length; i++) {
+        const expected = frame.stack[i];
+        const actual = expressionType(stack.items[i].e);
+        if (!actual) continue;
+        const primitive = actual.kind === 'prim' ? actual.name : undefined;
+        const matches =
+          expected.tag === 1
+            ? primitive !== undefined &&
+              ['boolean', 'byte', 'char', 'short', 'int'].includes(primitive)
+            : expected.tag === 2
+              ? primitive === 'float'
+              : expected.tag === 3
+                ? primitive === 'double'
+                : expected.tag === 4
+                  ? primitive === 'long'
+                  : expected.tag >= 5
+                    ? primitive === undefined
+                    : true;
+        if (!matches)
+          throw new SimFail(`Operand type disagrees with StackMapTable at ${b.startPc}`);
+      }
     const stmts: Stmt[] = [];
     this.sim.terms[id] = { t: 'none' };
     try {

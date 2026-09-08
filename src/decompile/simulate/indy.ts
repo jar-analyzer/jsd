@@ -8,13 +8,42 @@ import { SimFail, type SwitchLabel } from './result.js';
 import type { ExprStack } from './stack.js';
 import { STR } from './helpers.js';
 import type { Simulator } from './index.js';
-import { bootstrapConstant, ConstantResolutionError } from './constants.js';
+import { bootstrapConstant, methodTypeExpression, ConstantResolutionError } from './constants.js';
 
 function invalid(message: string): never {
   throw new ConstantResolutionError(message, 'INVALID_BOOTSTRAP');
 }
 
-function validateLambda(bsm: BootstrapMethod, alt: boolean, capturedCount: number): string[] {
+function interfaceMethods(
+  sim: Simulator,
+  name: string,
+  visiting = new Set<string>(),
+): { name: string; descriptor: string }[] | null {
+  if (['java/io/Serializable', 'java/lang/Cloneable'].includes(name)) return [];
+  if (visiting.has(name)) return null;
+  const cls = sim.ctx.lookup(name);
+  if (!cls || !(cls.access & 0x0200) || cls.permitted.length) return null;
+  visiting.add(name);
+  const methods = cls.methods
+    .filter((m) => m.access & 0x0400)
+    .map((m) => ({ name: m.name, descriptor: m.descriptor }));
+  for (const parent of cls.interfaces) {
+    const inherited = interfaceMethods(sim, parent, visiting);
+    if (!inherited) return null;
+    methods.push(...inherited);
+  }
+  visiting.delete(name);
+  return methods;
+}
+
+function validateLambda(
+  bsm: BootstrapMethod,
+  alt: boolean,
+  capturedCount: number,
+  sim: Simulator,
+  samName: string,
+  target: string,
+): string[] {
   const [sam, impl, instantiated] = bsm.args;
   if (
     sam?.kind !== 'methodType' ||
@@ -41,12 +70,18 @@ function validateLambda(bsm: BootstrapMethod, alt: boolean, capturedCount: numbe
     );
   if (!alt && bsm.args.length !== 3) invalid('Unexpected metafactory arguments');
   const interfaces: string[] = [];
+  const bridgeMethods = new Set(
+    (interfaceMethods(sim, target) ?? [])
+      .filter((m) => m.name === samName)
+      .map((m) => m.descriptor),
+  );
   if (alt) {
     const flags = bsm.args[3];
     if (flags?.kind !== 'int') invalid('Missing altMetafactory flags');
     if (flags.value < 0 || (flags.value & ~7) !== 0) invalid('Unknown altMetafactory flags');
     if (flags.value & 1) interfaces.push('java/io/Serializable');
     let cursor = 4;
+    const seenBridges = new Set<string>();
     for (const flag of [2, 4]) {
       if (!(flags.value & flag)) continue;
       const count = bsm.args[cursor++];
@@ -56,21 +91,37 @@ function validateLambda(bsm: BootstrapMethod, alt: boolean, capturedCount: numbe
         const arg = bsm.args[cursor++];
         if (flag === 2) {
           if (arg.kind !== 'type') invalid('Lambda marker must be a Class');
-          if (!['java/io/Serializable', 'java/lang/Cloneable'].includes(arg.typeName))
+          const methods = interfaceMethods(sim, arg.typeName);
+          const compatible = methods?.every((m) => {
+            const type = parseMethodDescriptor(m.descriptor);
+            return (
+              m.name === samName &&
+              m.descriptor.slice(0, m.descriptor.indexOf(')') + 1) ===
+                sam.descriptor.slice(0, sam.descriptor.indexOf(')') + 1) &&
+              (JSON.stringify(type.ret) === JSON.stringify(instType.ret) ||
+                (type.ret.kind === 'class' &&
+                  type.ret.name === 'java/lang/Object' &&
+                  instType.ret.kind !== 'prim'))
+            );
+          });
+          if (!compatible)
             throw new ConstantResolutionError(
-              'Unverified lambda marker interface: ' + arg.typeName,
+              'Unverified lambda intersection interface: ' + arg.typeName,
               'UNSUPPORTED_INVOKEDYNAMIC',
             );
+          for (const method of methods!) bridgeMethods.add(method.descriptor);
           interfaces.push(arg.typeName);
         } else {
           if (arg.kind !== 'methodType') invalid('Lambda bridge must be a MethodType');
           parseMethodDescriptor(arg.descriptor);
-          if (arg.descriptor === sam.descriptor)
-            invalid('Lambda bridge duplicates its SAM signature');
-          throw new ConstantResolutionError(
-            'Additional lambda bridge signature is not yet reconstructed',
-            'UNSUPPORTED_INVOKEDYNAMIC',
-          );
+          if (arg.descriptor === sam.descriptor || seenBridges.has(arg.descriptor))
+            invalid('Duplicate lambda bridge signature');
+          seenBridges.add(arg.descriptor);
+          if (!bridgeMethods.has(arg.descriptor))
+            throw new ConstantResolutionError(
+              'Unverified lambda bridge signature',
+              'UNSUPPORTED_INVOKEDYNAMIC',
+            );
         }
       }
     }
@@ -112,7 +163,7 @@ function restartIsZero(simulator: Simulator, value: Expr): boolean {
   return stores > 0;
 }
 
-function execute(this: Simulator, ins: Instr, stack: ExprStack): void {
+function execute(this: Simulator, ins: Instr, stack: ExprStack, stmts: Stmt[]): void {
   const d = this.cls.cp.dynamic(ins.cpIndex!, 'callsite');
   const bsm = this.cls.bootstrapMethods[d.bsm];
   if (!bsm) invalid('Missing bootstrap method #' + d.bsm);
@@ -174,7 +225,7 @@ function execute(this: Simulator, ins: Instr, stack: ExprStack): void {
         partTypes.push(md.params[argI++]);
       } else if (ch === '\u0002') {
         flush();
-        const constant = bootstrapConstant(this.cls, constants[constI++]);
+        const constant = bootstrapConstant(this.cls, constants[constI++], new Set(), this.ctx);
         if (constant.kind === 'const' && constant.ctype === 'null')
           invalid('Concat static constants must not be null');
         parts.push(constant);
@@ -193,14 +244,16 @@ function execute(this: Simulator, ins: Instr, stack: ExprStack): void {
   const altLambda = is('java/lang/invoke/LambdaMetafactory', 'altMetafactory');
   if (lambda || altLambda) {
     if (md.ret.kind !== 'class') invalid('Lambda factory must return an interface reference');
-    const interfaces = validateLambda(bsm, altLambda, md.params.length);
+    const interfaces = validateLambda(bsm, altLambda, md.params.length, this, d.name, md.ret.name);
+    for (let i = 0; i < stack.items.length; i++)
+      stack.items[i].e = this.preserveDiscarded(stack.items[i].e, ins.pc, -i - 1, stmts, true);
     stack.push({
       kind: 'invoke',
       mode: 'special',
       owner: 'java/lang/invoke/LambdaMetafactory',
       name: 'metafactory',
       descriptor: d.descriptor,
-      args,
+      args: args.map((arg, i) => this.preserveDiscarded(arg, ins.pc, i, stmts, true)),
       bootstrap: { name: d.name, index: d.bsm, interfaces },
     });
     return;
@@ -217,17 +270,75 @@ function execute(this: Simulator, ins: Instr, stack: ExprStack): void {
       md.ret.name !== 'int'
     )
       invalid('Invalid switch call site descriptor');
-    if (!restartIsZero(this, args[1]))
-      throw new ConstantResolutionError(
-        'Switch restart/guard semantics are not yet reconstructed',
-        'UNSUPPORTED_INVOKEDYNAMIC',
-      );
     const next = this.cfg.blocks.flatMap((b) => b.instrs).find((i) => i.pc === ins.pc + 5);
-    if (!next || (next.op !== 0xaa && next.op !== 0xab))
-      throw new ConstantResolutionError(
-        'Switch bootstrap result is not consumed by a switch instruction',
-        'UNSUPPORTED_INVOKEDYNAMIC',
-      );
+    if (!restartIsZero(this, args[1]) || !next || (next.op !== 0xaa && next.op !== 0xab)) {
+      if (this.cls.enclosing)
+        throw new ConstantResolutionError(
+          'Dynamic switch caching in local/anonymous classes is not yet reconstructed',
+          'UNSUPPORTED_INVOKEDYNAMIC',
+        );
+      let entries = this.ctx.dynamicConstants.get(this.cls);
+      if (!entries) this.ctx.dynamicConstants.set(this.cls, (entries = new Map()));
+      let switches = this.ctx.dynamicSwitches.get(this.cls);
+      if (!switches) this.ctx.dynamicSwitches.set(this.cls, (switches = new Map()));
+      let entry = switches.get(ins.cpIndex!);
+      if (!entry) {
+        let name = `$jsd$switch$${ins.cpIndex}`;
+        const names = new Set([
+          ...this.cls.methods.map((m) => m.name),
+          ...this.cls.innerClasses.map((c) => c.innerName),
+        ]);
+        while (names.has(name) || names.has(name + '$handle') || names.has(name + '$handle$State'))
+          name += '$';
+        const handleName = name + '$handle';
+        const factory: Expr = {
+          kind: 'invoke',
+          mode: 'static',
+          ...bsm.ref.ref,
+          args: [
+            {
+              kind: 'invoke',
+              mode: 'static',
+              owner: 'java/lang/invoke/MethodHandles',
+              name: 'lookup',
+              descriptor: '()Ljava/lang/invoke/MethodHandles$Lookup;',
+              args: [],
+            },
+            { kind: 'const', ctype: 'string', value: d.name },
+            methodTypeExpression(d.descriptor),
+            {
+              kind: 'array-init',
+              elemType: { kind: 'class', name: 'java/lang/Object' },
+              values: bsm.args.map((arg) => bootstrapConstant(this.cls, arg, new Set(), this.ctx)),
+            },
+          ],
+        };
+        entries.set(-ins.cpIndex!, {
+          name: handleName,
+          type: { kind: 'class', name: 'java/lang/invoke/MethodHandle' },
+          expr: {
+            kind: 'invoke',
+            mode: 'virtual',
+            owner: 'java/lang/invoke/CallSite',
+            name: 'getTarget',
+            descriptor: '()Ljava/lang/invoke/MethodHandle;',
+            target: factory,
+            args: [],
+          },
+        });
+        entry = { name, handleName, selector: md.params[0] };
+        switches.set(ins.cpIndex!, entry);
+      }
+      stack.push({
+        kind: 'invoke',
+        mode: 'static',
+        owner: this.cls.name,
+        name: entry.name,
+        descriptor: d.descriptor,
+        args,
+      });
+      return;
+    }
     const labels: SwitchLabel[] = bsm.args.map((arg) => {
       if (typeSwitch && arg.kind === 'type') return { kind: 'type', text: arg.typeName };
       if (
@@ -333,9 +444,9 @@ function execute(this: Simulator, ins: Instr, stack: ExprStack): void {
 }
 
 export const indyPart: ThisType<Simulator> & Pick<Simulator, 'execInvokeDynamic'> = {
-  execInvokeDynamic(ins: Instr, stack: ExprStack, _stmts: Stmt[]): void {
+  execInvokeDynamic(ins: Instr, stack: ExprStack, stmts: Stmt[]): void {
     try {
-      execute.call(this, ins, stack);
+      execute.call(this, ins, stack, stmts);
     } catch (error) {
       this.ctx.diagnostics.add({
         code: error instanceof ConstantResolutionError ? error.code : 'INVALID_BOOTSTRAP',

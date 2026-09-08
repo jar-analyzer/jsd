@@ -6,7 +6,7 @@ import {
 import { Acc, ClassFile, FieldInfo, MethodInfo } from '../../classfile/model.js';
 import { JType, parseFieldDescriptor } from '../../classfile/types.js';
 import { Ctx } from '../context.js';
-import { nestedDisplay, simpleOf, typeStr, RenderCtx } from '../printer/index.js';
+import { nestedDisplay, simpleOf, typeStr, exprStr, RenderCtx } from '../printer/index.js';
 import {
   MethodSigInfo,
   buildMethodSig,
@@ -73,6 +73,7 @@ export class ClassGenerator {
   ) {}
 
   generate(): ClassSource {
+    this.ctx.budget.check();
     const simple0 = this.cls.name.slice(
       Math.max(this.cls.name.lastIndexOf('/'), this.cls.name.lastIndexOf('$')) + 1,
     );
@@ -127,6 +128,8 @@ export class ClassGenerator {
       body = body.slice(0, i) + nestedText + '\n' + indent + body.slice(i);
     }
     const source = body + '\n';
+    this.ctx.budget.check();
+    if (this.standalone) this.ctx.budget.outputChars(source.length);
     const simple = this.cls.name.slice(this.cls.name.lastIndexOf('/') + 1);
     return {
       name: this.cls.name,
@@ -230,7 +233,52 @@ export class ClassGenerator {
     const header = this.classHeader();
     this.out.push(header + ' {');
     this.renderMembers();
+    this.renderDynamicConstants();
     this.out.push('}');
+  }
+
+  renderDynamicConstants(): void {
+    for (const { name, handleName, selector } of this.ctx.dynamicSwitches.get(this.cls)?.values() ??
+      []) {
+      this.out.push(`
+    private static int ${name}(${this.renderType(selector)} value, int restart) {
+        try {
+            return (int) ${handleName}().invokeExact(value, restart);
+        } catch (java.lang.RuntimeException | java.lang.Error error) {
+            throw error;
+        } catch (java.lang.Throwable error) {
+            throw new java.lang.AssertionError(error);
+        }
+    }
+`);
+    }
+    for (const { name, expr, type } of this.ctx.dynamicConstants.get(this.cls)?.values() ?? []) {
+      const state = name + '$State';
+      const t = this.renderType(type);
+      const value = exprStr(expr, this.renderCtxForTypes());
+      this.out.push(`
+    ${this.isInterface ? '' : 'private static '}class ${state} {
+        static java.lang.Object value;
+        static java.lang.Error error;
+        static boolean resolved;
+    }
+    private static ${t} ${name}() {
+        synchronized (${state}.class) {
+            if (${state}.error != null) throw ${state}.error;
+            if (!${state}.resolved) {
+                try {
+                    ${state}.value = ${value};
+                    ${state}.resolved = true;
+                } catch (java.lang.Throwable cause) {
+                    ${state}.error = cause instanceof java.lang.Error ? (java.lang.Error) cause : new java.lang.BootstrapMethodError(cause);
+                    throw ${state}.error;
+                }
+            }
+            return (${t}) ${state}.value;
+        }
+    }
+`);
+    }
   }
 
   classHeader(): string {

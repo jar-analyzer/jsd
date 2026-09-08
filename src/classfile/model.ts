@@ -1,3 +1,4 @@
+import type { StackMapFrame } from './stackmap.js';
 import type { ConstantPool } from './cpool.js';
 
 export const enum Acc {
@@ -108,6 +109,7 @@ export interface LocalVarEntry {
 }
 
 export interface CodeAttr {
+  stackMapFrames?: StackMapFrame[];
   maxStack: number;
   maxLocals: number;
   code: Uint8Array;

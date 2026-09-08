@@ -42,13 +42,28 @@ if (major < 11) {
       harness,
       `public class RunDynamic {
         public static void main(String[] args) throws Exception {
-          Object value = Class.forName(args[0]).getMethod("value").invoke(null);
+          java.lang.reflect.Method method = Class.forName(args[0]).getMethod("value");
+          if (args.length > 1 && args[1].equals("error")) {
+            String type = null;
+            for (int i = 0; i < 2; i++) {
+              try { method.invoke(null); throw new AssertionError("Expected resolution failure"); }
+              catch (java.lang.reflect.InvocationTargetException error) {
+                String actual = error.getCause().getClass().getName();
+                if (type != null && !type.equals(actual)) throw new AssertionError("Failure was not retained");
+                type = actual;
+              }
+            }
+            System.out.print(type);
+            return;
+          }
+          Object value = method.invoke(null);
+          if (args.length > 1 && args[1].equals("identity") && value != method.invoke(null))
+            throw new AssertionError("Constant identity changed between resolutions");
           if (value instanceof java.util.function.Supplier)
             value = ((java.util.function.Supplier<?>) value).get();
           ${
             major >= 12
-              ? `// Compare descriptor contents, not JDK-specific toString() formatting.
-          if (value instanceof java.lang.constant.ClassDesc)
+              ? `if (value instanceof java.lang.constant.ClassDesc)
             value = ((java.lang.constant.ClassDesc) value).descriptorString();
           else if (value instanceof Enum.EnumDesc) {
             Enum.EnumDesc<?> desc = (Enum.EnumDesc<?>) value;
@@ -62,9 +77,9 @@ if (major < 11) {
     );
     for (const dir of [original, recovered]) run('javac', ['-d', dir, harness]);
     const cases = dynamicFixtures().filter((fixture) => (fixture.minJava ?? 11) <= major);
-    for (const { name, bytes, expected } of cases) {
+    for (const { name, bytes, expected, mode } of cases) {
       writeFileSync(join(original, `${name}.class`), bytes);
-      const actual = run('java', ['-cp', original, 'RunDynamic', name]);
+      const actual = run('java', ['-cp', original, 'RunDynamic', name, mode ?? 'value']);
       assert.equal(actual, expected, `${name}: original JVM behavior`);
       const result = decompileClassFile(bytes, { banner: false });
       assert.equal(result.status, 'success', `${name}: ${JSON.stringify(result.diagnostics)}`);
@@ -72,7 +87,7 @@ if (major < 11) {
       writeFileSync(source, result.source);
       run('javac', ['-d', recovered, source]);
       assert.equal(
-        run('java', ['-cp', recovered, 'RunDynamic', name]),
+        run('java', ['-cp', recovered, 'RunDynamic', name, mode ?? 'value']),
         actual,
         `${name}: recovered behavior`,
       );

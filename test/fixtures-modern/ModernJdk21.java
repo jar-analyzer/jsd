@@ -21,7 +21,37 @@ public class ModernJdk21 {
     };
   }
 
+  static int checks;
+
+  static boolean guard(String value) {
+    checks++;
+    return value.length() > 2;
+  }
+
+  static int guarded(Object value) {
+    return switch (value) {
+      case null -> -1;
+      case String s when guard(s) -> s.length();
+      case String s -> 0;
+      case Integer n when n > 0 -> n;
+      default -> -2;
+    };
+  }
+
   public static void main(String[] args) {
+    System.out.println(
+      guarded(null) +
+        ":" +
+        guarded("a") +
+        ":" +
+        guarded("abcd") +
+        ":" +
+        guarded(-1) +
+        ":" +
+        guarded(7) +
+        ":" +
+        checks
+    );
     System.out.println(
       stateCode(null) + ":" + stateCode(Thread.State.NEW) + ":" + stateCode(Thread.State.RUNNABLE)
     );

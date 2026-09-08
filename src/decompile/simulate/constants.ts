@@ -1,3 +1,4 @@
+import type { Ctx } from '../context.js';
 import type { Expr } from '../../ast/ast.js';
 import type { BootstrapArg, ClassFile } from '../../classfile/model.js';
 import { parseFieldDescriptor, parseMethodDescriptor, type JType } from '../../classfile/types.js';
@@ -40,6 +41,7 @@ export function bootstrapConstant(
   cls: ClassFile,
   arg: BootstrapArg,
   visiting = new Set<number>(),
+  ctx?: Ctx,
 ): Expr {
   switch (arg.kind) {
     case 'string':
@@ -53,7 +55,9 @@ export function bootstrapConstant(
     case 'methodType':
       return methodTypeExpression(arg.descriptor);
     case 'dynamic':
-      return dynamicConstant(cls, arg.index, visiting);
+      return ctx
+        ? cachedDynamicConstant(ctx, cls, arg.index, visiting)
+        : dynamicConstant(cls, arg.index, visiting);
     case 'methodHandle':
       throw new ConstantResolutionError(
         `MethodHandle kind ${arg.handle.kind}: ${arg.handle.ref.owner}.${arg.handle.ref.name}${arg.handle.ref.descriptor} requires JVM lookup semantics`,
@@ -61,7 +65,12 @@ export function bootstrapConstant(
   }
 }
 
-export function dynamicConstant(cls: ClassFile, index: number, visiting = new Set<number>()): Expr {
+export function dynamicConstant(
+  cls: ClassFile,
+  index: number,
+  visiting = new Set<number>(),
+  ctx?: Ctx,
+): Expr {
   if (visiting.has(index) || visiting.size >= 32)
     throw new ConstantResolutionError(
       `Cyclic or excessively nested dynamic constant at cp[${index}]`,
@@ -100,7 +109,29 @@ export function dynamicConstant(cls: ClassFile, index: number, visiting = new Se
       type.kind === 'class' &&
       /^[\p{ID_Start}_$][\p{ID_Continue}$]*$/u.test(dynamic.name)
     )
-      return { kind: 'field-get', owner: type.name, name: dynamic.name, jtype: type };
+      return {
+        kind: 'cast',
+        jtype: type,
+        expr: {
+          kind: 'invoke',
+          mode: 'static',
+          owner,
+          name: 'enumConstant',
+          descriptor: bootstrapDescriptors.enumConstant,
+          args: [
+            {
+              kind: 'invoke',
+              mode: 'static',
+              owner: 'java/lang/invoke/MethodHandles',
+              name: 'lookup',
+              descriptor: '()Ljava/lang/invoke/MethodHandles$Lookup;',
+              args: [],
+            },
+            { kind: 'const', ctype: 'string', value: dynamic.name },
+            classLiteral(type),
+          ],
+        },
+      };
     const implicitFinal = matchesBootstrap(
       bootstrap,
       owner,
@@ -127,7 +158,6 @@ export function dynamicConstant(cls: ClassFile, index: number, visiting = new Se
           'getStaticFinal requires a declaring Class',
           'INVALID_BOOTSTRAP',
         );
-      // Retain JVM lookup/access checks instead of assuming the field is publicly accessible.
       return {
         kind: 'cast',
         jtype: type,
@@ -192,12 +222,11 @@ export function dynamicConstant(cls: ClassFile, index: number, visiting = new Se
             owner: ref.owner,
             name: ref.name,
             descriptor: ref.descriptor,
-            args,
+            args: ctx ? arguments_.map((arg) => bootstrapConstant(cls, arg, visiting, ctx)) : args,
           };
         }
       }
     }
-    // Resolve nested arguments only to validate their graph; never execute a bootstrap.
     for (const arg of bootstrap.args)
       if (arg.kind === 'dynamic') dynamicConstant(cls, arg.index, visiting);
     throw new ConstantResolutionError(
@@ -206,4 +235,41 @@ export function dynamicConstant(cls: ClassFile, index: number, visiting = new Se
   } finally {
     visiting.delete(index);
   }
+}
+
+export function cachedDynamicConstant(
+  ctx: Ctx,
+  cls: ClassFile,
+  index: number,
+  visiting = new Set<number>(),
+): Expr {
+  let entries = ctx.dynamicConstants.get(cls);
+  if (!entries) ctx.dynamicConstants.set(cls, (entries = new Map()));
+  let entry = entries.get(index);
+  if (!entry) {
+    const expr = dynamicConstant(cls, index, visiting, ctx);
+    if (expr.kind === 'const' || expr.kind === 'class-literal') return expr;
+    if (cls.enclosing)
+      throw new ConstantResolutionError(
+        'Dynamic constant caching in local/anonymous classes is not yet reconstructed',
+      );
+    const type = parseFieldDescriptor(cls.cp.dynamic(index, 'constant').descriptor);
+    let name = `$jsd$condy$${index}`;
+    const used = new Set([
+      ...cls.methods.map((m) => m.name),
+      ...cls.fields.map((f) => f.name),
+      ...cls.innerClasses.map((c) => c.innerName),
+    ]);
+    while (used.has(name) || used.has(name + '$State')) name += '$';
+    entry = { name, expr, type };
+    entries.set(index, entry);
+  }
+  return {
+    kind: 'invoke',
+    mode: 'static',
+    owner: cls.name,
+    name: entry.name,
+    descriptor: '()' + cls.cp.dynamic(index, 'constant').descriptor,
+    args: [],
+  };
 }

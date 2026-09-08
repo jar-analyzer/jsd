@@ -197,7 +197,12 @@ export const switchPart: ThisType<Structurer> &
       );
       cases.push({ labels: [], body, hasDefault: true });
     }
-    const sw: Stmt = { kind: 'switch', subject, cases };
+    const scopedCases =
+      subject.kind === 'invoke' &&
+      [...(this.ctx.dynamicSwitches.get(this.cls)?.values() ?? [])].some(
+        (entry) => entry.name === subject.name,
+      );
+    const sw: Stmt = { kind: 'switch', subject, cases, scopedCases };
     if (patMode) (sw as { patternMode?: boolean }).patternMode = true;
     stmts.push(sw);
     return followNode;

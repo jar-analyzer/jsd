@@ -2,7 +2,13 @@ import { DynamicClassBuilder, ldc, indy } from './dynamic-class-builder.js';
 import { bootstrapDescriptors } from '../src/decompile/bootstrap.js';
 
 export function dynamicFixtures() {
-  const cases: { name: string; bytes: Uint8Array; expected: string; minJava?: number }[] = [];
+  const cases: {
+    name: string;
+    bytes: Uint8Array;
+    expected: string;
+    minJava?: number;
+    mode?: 'identity' | 'error';
+  }[] = [];
   for (const [name, bootstrapName, constantName, descriptor, expected] of [
     ['DynamicNull', 'nullConstant', 'nil', 'Ljava/lang/String;', 'null'],
     ['DynamicIntClass', 'primitiveClass', 'I', 'Ljava/lang/Class;', 'int'],
@@ -116,6 +122,7 @@ export function dynamicFixtures() {
       name,
       bytes: b.build([...ldc(value), 0xb0], `()${descriptor}`),
       minJava: 12,
+      mode: 'identity',
       expected:
         name === 'DynamicClassDesc' ? 'Ljava/lang/Thread$State;' : 'Ljava/lang/Thread$State;:NEW',
     });
@@ -167,6 +174,85 @@ export function dynamicFixtures() {
       name,
       expected: '[]',
       bytes: b.build([...indy(call), 0xb0], '()Ljava/util/function/Supplier;'),
+    });
+  }
+  for (const [name, method, field, descriptor, expected] of [
+    ['MissingFinal', 'getStaticFinal', 'MISSING', 'I', 'java.lang.NoSuchFieldError'],
+    [
+      'MissingEnum',
+      'enumConstant',
+      'MISSING',
+      'Ljava/lang/Thread$State;',
+      'java.lang.BootstrapMethodError',
+    ],
+  ] as const) {
+    const b = new DynamicClassBuilder(name);
+    const bs = b.bootstrap(
+      b.handle('java/lang/invoke/ConstantBootstraps', method, bootstrapDescriptors[method]),
+    );
+    const value = b.dynamic(17, bs, field, descriptor);
+    cases.push({
+      name,
+      expected,
+      mode: 'error',
+      bytes: b.build([...ldc(value), descriptor === 'I' ? 0xac : 0xb0], `()${descriptor}`),
+    });
+  }
+  for (const [name, restart, expected, mode] of [
+    ['SwitchRestart', 1, '1', undefined],
+    ['SwitchExhausted', 2, '2', undefined],
+    ['SwitchInvalidRestart', -1, 'java.lang.IndexOutOfBoundsException', 'error'],
+  ] as const) {
+    const b = new DynamicClassBuilder(name);
+    const bs = b.bootstrap(
+      b.handle('java/lang/runtime/SwitchBootstraps', 'typeSwitch', bootstrapDescriptors.typeSwitch),
+      [b.classRef('java/lang/String'), b.classRef('java/lang/String')],
+    );
+    const call = b.dynamic(18, bs, 'typeSwitch', '(Ljava/lang/Object;I)I');
+    cases.push({
+      name,
+      expected,
+      mode,
+      minJava: 21,
+      bytes: b.build(
+        [...ldc(b.string('test')), ...ldc(b.integer(restart)), ...indy(call), 0xac],
+        '()I',
+      ),
+    });
+  }
+  {
+    const name = 'CapturedLocalSnapshot';
+    const b = new DynamicClassBuilder(name);
+    const bs = b.bootstrap(
+      b.handle(
+        'java/lang/invoke/LambdaMetafactory',
+        'metafactory',
+        bootstrapDescriptors.metafactory,
+      ),
+      [
+        b.methodType('()Ljava/lang/Object;'),
+        b.handle('java/lang/String', 'trim', '()Ljava/lang/String;', 5),
+        b.methodType('()Ljava/lang/String;'),
+      ],
+    );
+    const call = b.dynamic(18, bs, 'get', '(Ljava/lang/String;)Ljava/util/function/Supplier;');
+    cases.push({
+      name,
+      expected: 'before',
+      bytes: b.build(
+        [
+          ...ldc(b.string(' before ')),
+          0x4b,
+          0x2a,
+          ...indy(call),
+          0x4c,
+          ...ldc(b.string('after')),
+          0x4b,
+          0x2b,
+          0xb0,
+        ],
+        '()Ljava/util/function/Supplier;',
+      ),
     });
   }
   return cases;

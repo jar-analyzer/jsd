@@ -158,7 +158,6 @@ export const membersPart: ThisType<ClassGenerator> &
     if (m.name === '<clinit>') return false;
     if (m.name.startsWith('lambda$')) return true;
     const a = m.access;
-    // javac regenerates the serialization dispatcher from intersection-typed lambdas.
     if (
       m.name === '$deserializeLambda$' &&
       m.descriptor === '(Ljava/lang/invoke/SerializedLambda;)Ljava/lang/Object;' &&

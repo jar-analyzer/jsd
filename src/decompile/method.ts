@@ -1,3 +1,4 @@
+import { validateStackMaps } from './stackmap.js';
 import { splitLocalSlots } from './locals.js';
 import { errorMessage, type DiagnosticStage } from './diagnostics.js';
 import { Stmt } from '../ast/ast.js';
@@ -60,6 +61,7 @@ function foldConstBranches(instrs: Instr[]): Instr[] {
 }
 
 export function decompileMethod(ctx: Ctx, cls: ClassFile, method: MethodInfo): MethodBody | null {
+  ctx.budget.check();
   if (!method.code) return null;
   let perCtx = methodCache.get(ctx);
   if (!perCtx) methodCache.set(ctx, (perCtx = new WeakMap()));
@@ -96,7 +98,10 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
   const code = method.code!;
   let instrs: Instr[];
   try {
-    instrs = foldConstBranches(decodeBytecode(code.code));
+    ctx.budget.check(code.code.length);
+    instrs = decodeBytecode(code.code);
+    validateStackMaps(method, instrs);
+    instrs = foldConstBranches(instrs);
   } catch (e) {
     return {
       stmts: [],
@@ -116,6 +121,7 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
   } catch (e) {
     return { stmts: [], failed: errorMessage(e), failedStage: 'cfg', disasm: disassemble(method) };
   }
+  ctx.budget.check();
   const localCount = splitLocalSlots(cfg, method);
   const sim = Simulator.run(ctx, cls, method, cfg, localCount);
   if (sim.failed) {
@@ -126,6 +132,7 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
       disasm: disassemble(method),
     };
   }
+  ctx.budget.check();
   const st = new Structurer(ctx, cls, method, cfg, sim);
   const res = st.run();
   if (res.failed) {

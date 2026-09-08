@@ -1,6 +1,6 @@
 import {
   bootstrapConstant,
-  dynamicConstant,
+  cachedDynamicConstant,
   methodTypeExpression,
   ConstantResolutionError,
 } from './constants.js';
@@ -624,7 +624,7 @@ export const opsPart: ThisType<Simulator> &
           );
           break;
         case 'dynamic':
-          stack.push(dynamicConstant(this.cls, idx), wide);
+          stack.push(cachedDynamicConstant(this.ctx, this.cls, idx), wide);
           break;
         default:
           throw new SimFail(`constant type ${cv.type} is not supported`);

@@ -79,6 +79,27 @@ export const loopPart: ThisType<Structurer> &
     const header = loop.header;
     const loopNodes = new Set([...loop.blocks].filter((x) => nodes.has(x)));
     this.structuredLoops.add(header);
+    if (this.t(header).t === 'switch') {
+      const join = this.cfg.ipdom[header];
+      if (join >= 0 && !loopNodes.has(join)) {
+        const pending = [...this.cfg.blocks[header].succs];
+        const seen = new Set<number>();
+        while (pending.length) {
+          const block = pending.pop()!;
+          if (
+            block === join ||
+            block === header ||
+            seen.has(block) ||
+            !nodes.has(block) ||
+            !dominatesP(this.cfg, header, block)
+          )
+            continue;
+          seen.add(block);
+          loopNodes.add(block);
+          pending.push(...this.cfg.blocks[block].succs);
+        }
+      }
+    }
 
     {
       const bodyClosure = new Set<number>();
@@ -90,6 +111,7 @@ export const loopPart: ThisType<Structurer> &
           if (
             sc < 0 ||
             sc === header ||
+            (this.t(header).t === 'switch' && sc === this.cfg.ipdom[header]) ||
             loopNodes.has(sc) ||
             bodyClosure.has(sc) ||
             !nodes.has(sc) ||
@@ -173,6 +195,17 @@ export const loopPart: ThisType<Structurer> &
         }
       }
       if (enterAt === backSrc && this.t(backSrc).t === 'goto') {
+        if (headerTerm.t === 'switch') {
+          const stmt: Stmt = { kind: 'while', cond: null, body: [] };
+          const brk = this.makeLoopBreakable(stmt, loopExits, [header], after);
+          stmt.body = this.walk(header, loopNodes, loopExits, {
+            implicitEnds: new Set(),
+            breakables: [...wctx.breakables, brk],
+          });
+          if (after >= 0) stmt.body.push({ kind: 'break' });
+          stmts.push(stmt);
+          return after;
+        }
         const wStmt: Stmt = { kind: 'while', cond: null, body: [] };
         const brk = this.makeLoopBreakable(wStmt, loopExits, [header, backSrc], after);
         const wctx2: WalkCtx = {
@@ -253,6 +286,17 @@ export const loopPart: ThisType<Structurer> &
         stmts.push(doStmt);
         return this.loopAfter(header, cT, nodes, loopNodes, exitSet, after);
       }
+    }
+    if (headerTerm.t === 'switch') {
+      const stmt: Stmt = { kind: 'while', cond: null, body: [] };
+      const brk = this.makeLoopBreakable(stmt, loopExits, [header], after);
+      stmt.body = this.walk(header, loopNodes, loopExits, {
+        implicitEnds: new Set(),
+        breakables: [...wctx.breakables, brk],
+      });
+      if (after >= 0) stmt.body.push({ kind: 'break' });
+      stmts.push(stmt);
+      return after;
     }
     const wStmt: Stmt = { kind: 'while', cond: null, body: [] };
     const brk = this.makeLoopBreakable(wStmt, loopExits, [header, backSrc], after);

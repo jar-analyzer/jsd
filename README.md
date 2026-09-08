@@ -11,9 +11,9 @@
 
 A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers as a single ESM bundle, with no runtime dependencies or WebAssembly.
 
-**Small enough to drop straight into your page: just one ~208 KB JavaScript file (~63 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
+**Small enough to drop straight into your page: just one ~217 KB JavaScript file (~65 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
 
-Size measured from the current minified `dist/jsd.min.js` bundle (~208 KB (0.208 MB) before gzip; ~63 KB (0.063 MB) after gzip).
+Size measured from the current minified `dist/jsd.min.js` bundle (~217 KB (0.217 MB) before gzip; ~65 KB (0.065 MB) after gzip).
 
 [Try the live demo](https://jar-analyzer.github.io/jsd/)
 
@@ -59,6 +59,10 @@ import { decompileClassFile } from '@jar-analyzer/jsd';
 const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);
 ```
+
+The development version also accepts `maxInputBytes` (bytes per class), `maxWork` (bytecode bytes and processing steps), `maxOutputChars`, `timeoutMs`, and `signal`. Limits are opt-in. Single-class calls throw `DecompileLimitError`; batch reports include `RESOURCE_LIMIT` or `DECOMPILE_CANCELLED` diagnostics. Work, time and output budgets are shared by a batch and reset for each decompilation operation.
+
+These checks are cooperative: use a Worker for interrupting synchronous work from another thread. `success` means no reported errors, not verified compilation or semantic equivalence.
 
 ## Testing
 

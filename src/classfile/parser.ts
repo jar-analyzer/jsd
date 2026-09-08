@@ -1,3 +1,4 @@
+import { parseStackMap } from './stackmap.js';
 import { ByteReader } from '../util/bytes.js';
 import { ConstantPool } from './cpool.js';
 import { parseFieldDescriptor, parseMethodDescriptor } from './types.js';
@@ -102,9 +103,13 @@ function parseCode(a: RawAttr, cp: ConstantPool): CodeAttr {
   const lineNumbers: { startPc: number; line: number }[] = [];
   const localVars: LocalVarEntry[] = [];
   const localVarTypes: LocalVarEntry[] = [];
+  let stackMapFrames: CodeAttr['stackMapFrames'];
   for (const at of readAttrs(rd, cp)) {
     const d = new ByteReader(at.data);
-    if (at.name === 'LineNumberTable') {
+    if (at.name === 'StackMapTable') {
+      if (stackMapFrames) throw new Error('Duplicate StackMapTable');
+      stackMapFrames = parseStackMap(at.data, cp);
+    } else if (at.name === 'LineNumberTable') {
       const n = d.u2();
       for (let i = 0; i < n; i++) lineNumbers.push({ startPc: d.u2(), line: d.u2() });
     } else if (at.name === 'LocalVariableTable') {
@@ -131,7 +136,16 @@ function parseCode(a: RawAttr, cp: ConstantPool): CodeAttr {
       }
     }
   }
-  return { maxStack, maxLocals, code, exceptions, lineNumbers, localVars, localVarTypes };
+  return {
+    maxStack,
+    maxLocals,
+    code,
+    exceptions,
+    lineNumbers,
+    localVars,
+    localVarTypes,
+    stackMapFrames,
+  };
 }
 
 function parseBootstrapArg(rd: ByteReader, cp: ConstantPool): BootstrapArg {

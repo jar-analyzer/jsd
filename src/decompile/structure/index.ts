@@ -122,6 +122,7 @@ export class Structurer {
     const claimedBefore = new Set<number>();
     for (let i = 0; i < this.claimed.length; i++) if (this.claimed[i]) claimedBefore.add(i);
     while (cur !== -1) {
+      this.ctx.budget.check(1);
       if (++steps > maxSteps) throw new StructFail('walk did not terminate');
       if (this.claimed[cur]) {
         if (claimedBefore.has(cur)) {

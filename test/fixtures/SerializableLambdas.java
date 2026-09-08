@@ -4,12 +4,17 @@ import java.util.function.IntUnaryOperator;
 
 public class SerializableLambdas {
 
+  interface Marker {}
+
+  interface ChildMarker extends Marker {}
+
   static Function<String, String> reference() {
     return (Function<String, String> & Serializable) String::trim;
   }
 
   static Function<String, String> captured(String prefix) {
-    return (Function<String, String> & Serializable & Cloneable) value -> prefix + value;
+    return (Function<String, String> & Serializable & Cloneable & ChildMarker) value ->
+      prefix + value;
   }
 
   static IntUnaryOperator primitive(int offset) {
@@ -34,6 +39,8 @@ public class SerializableLambdas {
     Function<String, String> cap = captured("prefix:");
     System.out.println(cap instanceof Serializable);
     System.out.println(cap instanceof Cloneable);
+    System.out.println(cap instanceof Marker);
+    System.out.println(copy(cap) instanceof ChildMarker);
     System.out.println(((Function<String, String>) copy(cap)).apply("value"));
     System.out.println(((IntUnaryOperator) copy(primitive(7))).applyAsInt(5));
   }

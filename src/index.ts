@@ -1,3 +1,5 @@
+import { WorkBudget, DecompileLimitError } from './decompile/budget.js';
+export { DecompileLimitError } from './decompile/budget.js';
 import { parseClass } from './classfile/parser.js';
 import type { ClassFile } from './classfile/model.js';
 import { Ctx, DecompileOptions } from './decompile/context.js';
@@ -33,12 +35,14 @@ export interface Decompiler {
 }
 
 export function createDecompiler(options: DecompileOptions = {}): Decompiler {
+  new WorkBudget(options);
   const classes = new Map<string, ClassFile>();
   const inputClasses = new Map<string, ClassFile>();
   const loadErrors = new Map<string, DecompileDiagnostic>();
   let lastDiagnostics: DecompileDiagnostic[] = [];
 
   const decompileAllDetailed = (): DecompileReport => {
+    const budget = new WorkBudget(options);
     const out: ClassSource[] = [];
     const allDiagnostics = new DiagnosticBag();
     for (const diagnostic of loadErrors.values()) allDiagnostics.add(diagnostic);
@@ -82,6 +86,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       } else topLevel.push(cls);
     }
     const collectOwn = (cls: ClassFile, acc: Set<string>): void => {
+      budget.check(1);
       for (const child of children.get(cls.name) ?? []) {
         if (acc.has(child.name)) throw new Error(`Cyclic inner class relationship: ${child.name}`);
         acc.add(child.name);
@@ -101,7 +106,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       const nested = (children.get(cls.name) ?? []).map(
         (child) => render(child, false, diagnostics).source,
       );
-      const ctx = new Ctx(cls, classes, options, diagnostics);
+      const ctx = new Ctx(cls, classes, options, diagnostics, budget);
       return generateClass(ctx, cls, standalone, nested, own);
     };
     for (const cls of topLevel) {
@@ -110,7 +115,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
         out.push(render(cls, true, diagnostics));
       } catch (error) {
         diagnostics.add({
-          code: 'CLASS_RENDER_FAILED',
+          code: error instanceof DecompileLimitError ? error.code : 'CLASS_RENDER_FAILED',
           severity: 'error',
           stage: 'render',
           className: cls.name,
@@ -143,6 +148,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
 
   return {
     addClass(data) {
+      new WorkBudget(options).input(data.byteLength);
       const cf = parseClass(data);
       classes.set(cf.name, cf);
       lastDiagnostics = [];
@@ -156,12 +162,13 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
         inputClasses.delete(name);
         loadErrors.delete(name);
         try {
+          new WorkBudget(options).input(data.byteLength);
           const cf = parseClass(data);
           classes.set(cf.name, cf);
           inputClasses.set(name, cf);
         } catch (error) {
           loadErrors.set(name, {
-            code: 'CLASS_PARSE_FAILED',
+            code: error instanceof DecompileLimitError ? error.code : 'CLASS_PARSE_FAILED',
             severity: 'error',
             stage: 'parse',
             inputName: name,
@@ -182,6 +189,8 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
 }
 
 export function decompileClassFile(data: Uint8Array, options?: DecompileOptions): ClassSource {
+  const budget = new WorkBudget(options ?? {});
+  budget.input(data.byteLength);
   const cf = parseClass(data);
   if (shouldSkip(cf)) {
     return {
@@ -200,7 +209,7 @@ export function decompileClassFile(data: Uint8Array, options?: DecompileOptions)
       ],
     };
   }
-  const ctx = new Ctx(cf, new Map([[cf.name, cf]]), options ?? {});
+  const ctx = new Ctx(cf, new Map([[cf.name, cf]]), options ?? {}, undefined, budget);
   return generateClass(ctx, cf, true);
 }
 

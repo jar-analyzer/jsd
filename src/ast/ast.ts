@@ -126,6 +126,7 @@ export type Stmt =
       stringMode?: boolean;
       enumMode?: { enumClass: string; labels: string[] };
       patternMode?: boolean;
+      scopedCases?: boolean;
     }
   | { kind: 'return'; expr?: Expr }
   | { kind: 'throw'; expr: Expr }

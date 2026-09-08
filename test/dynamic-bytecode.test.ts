@@ -130,7 +130,12 @@ for (const [name, constantName, descriptor, source] of [
   ['nullConstant', 'nil', 'Ljava/lang/String;', /return null;/],
   ['primitiveClass', 'I', 'Ljava/lang/Class;', /return int.class;/],
   ['primitiveClass', 'V', 'Ljava/lang/Class;', /return void.class;/],
-  ['enumConstant', 'RUNNABLE', 'Ljava/lang/Thread$State;', /State.RUNNABLE/],
+  [
+    'enumConstant',
+    'RUNNABLE',
+    'Ljava/lang/Thread$State;',
+    /enumConstant\(.*"RUNNABLE", State.class\)/,
+  ],
 ] as const) {
   test(`ConstantDynamic ${name}/${constantName} restores its Java expression`, () => {
     const b = new DynamicClassBuilder();
@@ -259,7 +264,7 @@ test('lambda bootstrap arguments are validated in order and unsupported flags ar
   }
 });
 
-test('a switch bootstrap used as an ordinary integer result is not replaced by its selector', () => {
+test('a switch bootstrap used as an ordinary integer result preserves its call site', () => {
   const b = new DynamicClassBuilder();
   const bs = b.bootstrap(
     b.handle('java/lang/runtime/SwitchBootstraps', 'typeSwitch', bootstrapDescriptors.typeSwitch),
@@ -267,8 +272,8 @@ test('a switch bootstrap used as an ordinary integer result is not replaced by i
   );
   const call = b.dynamic(18, bs, 'typeSwitch', '(Ljava/lang/Object;I)I');
   const result = decompileClassFile(b.build([0x01, 0x03, ...indy(call), 0xac], '()I'));
-  assert.equal(result.status, 'partial');
-  assert.ok(result.diagnostics.some((d) => d.code === 'UNSUPPORTED_INVOKEDYNAMIC'));
+  assert.equal(result.status, 'success');
+  assert.match(result.source, /invokeExact\(value, restart\)/);
 });
 
 test('unknown dynamic constants inside a concat recipe are not converted into string literals', () => {
@@ -318,12 +323,8 @@ test('nonzero switch restart indices are diagnosed instead of silently discarded
     0xac,
   ];
   const result = decompileClassFile(b.build(code, '()I'));
-  assert.equal(result.status, 'partial');
-  assert.ok(
-    result.diagnostics.some(
-      (d) => d.code === 'UNSUPPORTED_INVOKEDYNAMIC' && /restart/.test(d.message),
-    ),
-  );
+  assert.equal(result.status, 'success');
+  assert.match(result.source, /invokeExact\(value, restart\)/);
 });
 
 test('null dynamic constants cannot silently become valid concat static arguments', () => {

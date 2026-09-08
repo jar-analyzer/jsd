@@ -116,7 +116,10 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
         for (const l of c.labels)
           lines.push(line(`    ${caseLabel(l, !!s.enumMode || !!s.patternMode)}`));
         if (c.hasDefault) lines.push(line('    default:'));
-        if (c.body.length) lines.push(...renderBlockOuter(c.body, rc, indent + 1));
+        if (s.scopedCases) lines.push(line('    {'));
+        if (c.body.length)
+          lines.push(...renderBlockOuter(c.body, rc, indent + (s.scopedCases ? 2 : 1)));
+        if (s.scopedCases) lines.push(line('    }'));
       }
       lines.push(line('}'));
       return lines;

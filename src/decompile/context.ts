@@ -1,3 +1,5 @@
+import type { Expr } from '../ast/ast.js';
+import { WorkBudget } from './budget.js';
 import { DiagnosticBag } from './diagnostics.js';
 import type { ClassFile, MethodInfo } from '../classfile/model.js';
 import type { JType } from '../classfile/types.js';
@@ -5,6 +7,11 @@ import { parseFieldDescriptor, parseMethodDescriptor, parseSignature } from '../
 import type { LocalVarEntry } from '../classfile/model.js';
 
 export interface DecompileOptions {
+  maxInputBytes?: number;
+  maxWork?: number;
+  maxOutputChars?: number;
+  timeoutMs?: number;
+  signal?: { readonly aborted: boolean };
   showSynthetic?: boolean;
   lineNumbers?: boolean;
   fallbackDisasm?: boolean;
@@ -74,6 +81,14 @@ export const JAVA_KEYWORDS = new Set([
 ]);
 
 export class Ctx {
+  readonly dynamicSwitches = new Map<
+    ClassFile,
+    Map<number, { name: string; handleName: string; selector: JType }>
+  >();
+  readonly dynamicConstants = new Map<
+    ClassFile,
+    Map<number, { name: string; expr: Expr; type: JType }>
+  >();
   readonly classes: Map<string, ClassFile>;
   readonly opts: DecompileOptions;
   private typeRevisions = new Map<MethodInfo, number>();
@@ -84,6 +99,7 @@ export class Ctx {
     all: Map<string, ClassFile>,
     opts: DecompileOptions = {},
     readonly diagnostics = new DiagnosticBag(),
+    readonly budget = new WorkBudget(opts),
   ) {
     this.classes = all;
     this.opts = opts;
