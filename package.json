@@ -1,6 +1,6 @@
 {
   "name": "@jar-analyzer/jsd",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pure TypeScript Java class decompiler — single-file library, no wasm, no native deps",
   "type": "module",
   "main": "./dist/jsd.min.js",
@@ -38,6 +38,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "tsc --emitDeclarationOnly && node scripts/build.mjs",
+    "release": "node scripts/publish.mjs",
     "sync": "cp dist/jsd.min.js demo/jsd.browser.js",
     "check": "tsc --noEmit",
     "test": "npm run build && npm run test:unit && node test/run-e2e.mjs",
