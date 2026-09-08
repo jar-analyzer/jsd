@@ -10,25 +10,21 @@
 
 **[English](./README.md)** | [简体中文](./README.zh-CN.md)
 
-A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers as a single ESM bundle, with no runtime dependencies or WebAssembly.
+A TypeScript Java `.class` decompiler for Node.js and browsers.
 
-**Small enough to drop straight into your page: just one ~238 KB JavaScript file (~72 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
+**Single ESM bundle: approximately 238 KB, or 72 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
 
-Size measured from the current minified `dist/jsd.min.js` bundle (~238 KB (0.238 MB) before gzip; ~72 KB (0.072 MB) after gzip).
+Supports common control flow, lambdas, nested classes, records and selected Java features through Java 25. Intended as the decompilation engine for the next generation of **jar-analyzer**.
 
-[Try the live demo](https://jar-analyzer.github.io/jsd/)
-
-It will serve as the underlying decompilation engine for the next generation of **jar-analyzer**.
-
-Supports common control flow, lambdas, nested classes, records and selected syntax through Java 25.
+[Live demo](https://jar-analyzer.github.io/jsd/)
 
 ## Usage
 
-Published on npm as [`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd), currently at version **1.0.3**.
+npm package: [`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd), published version **1.0.3**.
 
 ### 1. Browser
 
-Load from the CDN and choose a `.class` file to view its source.
+Load from the CDN and decompile a selected `.class` file.
 
 ```html
 <input type="file" accept=".class" />
@@ -48,7 +44,7 @@ Load from the CDN and choose a `.class` file to view its source.
 ### 2. Node.js
 
 ```sh
-npm i @jar-analyzer/jsd
+npm install @jar-analyzer/jsd
 ```
 
 Save as `example.mjs` and run `node example.mjs`:
@@ -61,7 +57,9 @@ const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);
 ```
 
-Input size is unlimited by default. To limit each `.class` file to 10 MB:
+### 3. Input limits
+
+Input size is unlimited by default. Limit each `.class` file to 10 MB:
 
 ```js
 const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
@@ -69,23 +67,19 @@ const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
 
 Oversized files raise an error. Batch processing records the error and continues with other files.
 
-For batches, use `maxTotalInputBytes` to limit the total loaded size and `maxClasses` to limit the number of loaded classes. `maxOutputChars` limits generated source; `maxWork` and `timeoutMs` limit processing. All limits are optional.
+Other optional limits: `maxTotalInputBytes` (batch size), `maxClasses` (class count), `maxOutputChars` (output characters), `maxWork` (work units) and `timeoutMs` (processing time).
 
 ## Testing
 
-`npm test` runs the build, unit, core round-trip and bytecode suites (JDK 11+). `npm run test:all` also runs quality checks, both Java debug modes, modern Java, package and fuzz tests (JDK 25+). Each run builds the library at most once.
-
-| Suite            | Command                                  | Coverage                                                                                                               | CI environment                               |
-| ---------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Quality          | `npm run format:check` / `npm run check` | Formatting, TypeScript checks and browser bundle consistency in CI                                                     | Node.js 24                                   |
-| Unit             | `npm run test:unit`                      | 216 engine and demo cases: parsing, types, diagnostics, resource limits and UI state                                   | Node.js 24                                   |
-| Java round-trip  | `npm run test:roundtrip`                 | 138 cases covering evaluation order, control flow, exceptions and resources; `-- --no-debug` removes debug information | JDK 8, 11, 17, 21, 25; no-debug on 8, 17, 25 |
-| Modern Java      | `npm run test:modern`                    | Up to 14 Java 9–25 cases, with and without debug information                                                           | JDK 21, 25                                   |
-| Bytecode         | `npm run test:bytecode`                  | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks                                                      | JDK 11, 17, 21, 25                           |
-| Package consumer | `npm run test:package`                   | Local package installation, TypeScript declarations, ESM imports, public APIs and license                              | Node.js 20, 24                               |
-| Fuzz             | `npm run test:fuzz`                      | 2,000 deterministic mutations per run, with an isolated corpus and worker                                              | Node.js 24, JDK 25                           |
-
-Counts reflect the current suite; applicable Java cases depend on the JDK version. Each CI category has its own workflow, triggered independently on pushes and pull requests. Workflows can run concurrently, subject to available runners.
+| Suite           | Coverage                                                            | CI environment                             |
+| --------------- | ------------------------------------------------------------------- | ------------------------------------------ |
+| Quality         | Formatting and types; CI also checks browser bundle consistency     | Node.js 24                                 |
+| Unit            | 216 engine and demo cases                                           | Node.js 24                                 |
+| Java round-trip | 138 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
+| Modern Java     | Up to 14 Java 9–25 cases, with and without debug information        | JDK 21, 25                                 |
+| Bytecode        | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks   | JDK 11, 17, 21, 25                         |
+| Package         | Installation, type declarations, ESM, public APIs and license       | Node.js 20, 24                             |
+| Fuzz            | 2,000 fixed-seed bytecode mutations                                 | Node.js 24, JDK 25                         |
 
 ## License
 
