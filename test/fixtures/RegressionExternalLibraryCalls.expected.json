@@ -1,0 +1,4 @@
+{
+  "stdout": "object\nobject\nobject\ngeneric\n",
+  "dependencies": ["ExternalCallLibrary.class"]
+}

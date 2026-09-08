@@ -1,7 +1,7 @@
 import { errorMessage } from '../diagnostics.js';
 import { Acc, ClassFile, MethodInfo } from '../../classfile/model.js';
 import { JType, parseFieldDescriptor, parseMethodDescriptor } from '../../classfile/types.js';
-import { Stmt, walkStmt } from '../../ast/ast.js';
+import { Expr, Stmt, walkStmt } from '../../ast/ast.js';
 import { resolveLambda } from '../lambdas.js';
 import { decompileMethod } from '../method.js';
 import { RenderCtx, renderStmts, renderStmtsHeader, typeStr } from '../printer/index.js';
@@ -23,8 +23,7 @@ export const anonPart: ThisType<ClassGenerator> &
       const ctor = cf.methods.find((mm) => mm.name === '<init>');
       if (!ctor && cf.access & Acc.Synthetic) continue;
       const dropFirstArg = ctor ? ctorHasOuterParam(cf, ctor) : false;
-      const lines: string[] = [];
-      const captureFields: { name: string; displayName: string; index: number; type: JType }[] = [];
+      const captureFields: { name: string; index: number; type: JType }[] = [];
       const superArgIndices: number[] = [];
       const ctorBody = ctor ? decompileMethod(this.ctx, cf, ctor) : null;
       const slots = new Map<number, number>();
@@ -39,11 +38,26 @@ export const anonPart: ThisType<ClassGenerator> &
       const initializers: Stmt[] = [];
       if (!ctorBody || ctorBody.failed)
         throw new Error(`Anonymous constructor could not be restored: ${cf.name}`);
+      let beforeSuper = true;
       for (const stmt of ctorBody.stmts) {
         if (stmt.kind === 'return' && !stmt.expr) continue;
         if (stmt.kind === 'expr') {
           const expr = stmt.expr;
+          if (
+            beforeSuper &&
+            dropFirstArg &&
+            expr.kind === 'invoke' &&
+            expr.mode === 'static' &&
+            expr.owner === 'java/util/Objects' &&
+            expr.name === 'requireNonNull' &&
+            expr.descriptor === '(Ljava/lang/Object;)Ljava/lang/Object;' &&
+            expr.args.length === 1 &&
+            expr.args[0].kind === 'local' &&
+            expr.args[0].slot === 1
+          )
+            continue;
           if (expr.kind === 'invoke' && expr.name === '<init>' && expr.superCall) {
+            beforeSuper = false;
             for (const arg of expr.args) {
               if (arg.kind !== 'local' || !slots.has(arg.slot))
                 throw new Error(`Unsupported anonymous superclass argument: ${cf.name}`);
@@ -68,7 +82,6 @@ export const anonPart: ThisType<ClassGenerator> &
               if (!field.name.startsWith('this$'))
                 captureFields.push({
                   name: field.name,
-                  displayName: '',
                   index: slots.get(expr.expr.slot)!,
                   type: parseFieldDescriptor(field.descriptor),
                 });
@@ -78,116 +91,112 @@ export const anonPart: ThisType<ClassGenerator> &
         }
         initializers.push(stmt);
       }
-      const fieldNames = new Map<string, string>();
-      const usedNames = new Set(cf.fields.map((f) => f.name));
-      for (const capture of captureFields) {
-        let displayName = '$capture' + capture.index;
-        while (usedNames.has(displayName)) displayName += '$';
-        usedNames.add(displayName);
-        capture.displayName = displayName;
-        fieldNames.set(cf.name + '#' + capture.name, displayName);
-      }
-      for (const f of cf.fields) {
-        if (
-          captureFields.some((capture) => capture.name === f.name) ||
-          f.synthetic ||
-          f.access & Acc.Synthetic
-        )
-          continue;
-        const t = f.signature ? safeSig(f.signature) : null;
-        const mods = [
-          [Acc.Public, 'public'],
-          [Acc.Private, 'private'],
-          [Acc.Protected, 'protected'],
-          [Acc.Static, 'static'],
-          [Acc.Final, 'final'],
-          [Acc.Volatile, 'volatile'],
-          [Acc.Transient, 'transient'],
-        ] as const;
-        const prefix = mods
-          .filter(([flag]) => f.access & flag)
-          .map(([, text]) => text)
-          .join(' ');
-        const constant = f.access & Acc.Static && f.constantValue ? this.constValueStr(f) : null;
-        lines.push(
-          '',
-          `    ${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
-        );
-      }
-      if (initializers.length && ctor) {
-        const rc = this.methodRenderCtxFor(cf, ctor);
-        rc.fieldNames = fieldNames;
-        const labels = new Set<string>();
-        let hasReturn = false;
-        for (const stmt of initializers)
-          walkStmt(stmt, (node) => {
-            if ('label' in node && node.label) labels.add(node.label);
-            if (node.kind === 'return') hasReturn = true;
-          });
-        let label = 'initialize';
-        while (labels.has(label)) label += '$';
-        if (hasReturn) {
-          for (const stmt of initializers)
-            walkStmt(stmt, (node) => {
-              if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
-            });
+      const renderMembers = (captureValues: ReadonlyMap<string, Expr>): string[] => {
+        const lines: string[] = [];
+        const bodyInitializers = structuredClone(initializers);
+        for (const f of cf.fields) {
+          if (
+            captureFields.some((capture) => capture.name === f.name) ||
+            f.synthetic ||
+            f.access & Acc.Synthetic
+          )
+            continue;
+          const t = f.signature ? safeSig(f.signature) : null;
+          const mods = [
+            [Acc.Public, 'public'],
+            [Acc.Private, 'private'],
+            [Acc.Protected, 'protected'],
+            [Acc.Static, 'static'],
+            [Acc.Final, 'final'],
+            [Acc.Volatile, 'volatile'],
+            [Acc.Transient, 'transient'],
+          ] as const;
+          const prefix = mods
+            .filter(([flag]) => f.access & flag)
+            .map(([, text]) => text)
+            .join(' ');
+          const constant = f.access & Acc.Static && f.constantValue ? this.constValueStr(f) : null;
           lines.push(
             '',
-            '    {',
-            `        ${label}: {`,
-            ...renderStmts(initializers, rc, 3),
-            '        }',
-            '    }',
+            `    ${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
           );
-        } else lines.push('', '    {', ...renderStmts(initializers, rc, 2), '    }');
-      }
-      for (const mm of cf.methods) {
-        if (mm.name === '<clinit>') {
-          const body = decompileMethod(this.ctx, cf, mm);
-          if (body?.failed) throw new Error(body.failed);
-          const stmts = body?.stmts.filter((s) => s.kind !== 'return') ?? [];
-          if (stmts.length)
+        }
+        if (bodyInitializers.length && ctor) {
+          const rc = this.methodRenderCtxFor(cf, ctor);
+          rc.fieldValues = captureValues;
+          const labels = new Set<string>();
+          let hasReturn = false;
+          for (const stmt of bodyInitializers)
+            walkStmt(stmt, (node) => {
+              if ('label' in node && node.label) labels.add(node.label);
+              if (node.kind === 'return') hasReturn = true;
+            });
+          let label = 'initialize';
+          while (labels.has(label)) label += '$';
+          if (hasReturn) {
+            for (const stmt of bodyInitializers)
+              walkStmt(stmt, (node) => {
+                if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
+              });
             lines.push(
               '',
-              '    static {',
-              ...renderStmts(stmts, this.methodRenderCtxFor(cf, mm), 2),
+              '    {',
+              `        ${label}: {`,
+              ...renderStmts(bodyInitializers, rc, 3),
+              '        }',
               '    }',
             );
-          continue;
+          } else lines.push('', '    {', ...renderStmts(bodyInitializers, rc, 2), '    }');
         }
-        if (mm.name === '<init>' || mm.synthetic || (mm.access & 0x0040) !== 0) continue;
-        if (
-          (mm.access & 0x1000) !== 0 &&
-          (mm.name.startsWith('access$') || mm.name.startsWith('lambda$'))
-        )
-          continue;
-        const body = decompileMethod(this.ctx, cf, mm);
-        if (!body || body.failed) continue;
-        const mrc = this.methodRenderCtxFor(cf, mm);
-        mrc.fieldNames = fieldNames;
-        mrc.scopes.push(new Map());
-        try {
-          const header = this.methodHeaderFor(cf, mm, mrc);
-          lines.push('');
-          if (header) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
-        } catch (e) {
-          this.ctx.diagnostics.add({
-            code: 'ANONYMOUS_METHOD_RENDER_FAILED',
-            severity: 'error',
-            stage: 'render',
-            className: cf.name,
-            methodName: mm.name,
-            descriptor: mm.descriptor,
-            message: errorMessage(e),
-          });
+        for (const mm of cf.methods) {
+          if (mm.name === '<clinit>') {
+            const body = decompileMethod(this.ctx, cf, mm);
+            if (body?.failed) throw new Error(body.failed);
+            const stmts = body?.stmts.filter((s) => s.kind !== 'return') ?? [];
+            if (stmts.length)
+              lines.push(
+                '',
+                '    static {',
+                ...renderStmts(stmts, this.methodRenderCtxFor(cf, mm), 2),
+                '    }',
+              );
+            continue;
+          }
+          if (mm.name === '<init>' || mm.synthetic || (mm.access & 0x0040) !== 0) continue;
+          if (
+            (mm.access & 0x1000) !== 0 &&
+            (mm.name.startsWith('access$') || mm.name.startsWith('lambda$'))
+          )
+            continue;
+          const body = decompileMethod(this.ctx, cf, mm);
+          if (!body || body.failed) continue;
+          const mrc = this.methodRenderCtxFor(cf, mm);
+          mrc.fieldValues = captureValues;
+          mrc.scopes.push(new Map());
+          try {
+            const header = this.methodHeaderFor(cf, mm, mrc);
+            lines.push('');
+            if (header) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
+          } catch (e) {
+            this.ctx.diagnostics.add({
+              code: 'ANONYMOUS_METHOD_RENDER_FAILED',
+              severity: 'error',
+              stage: 'render',
+              className: cf.name,
+              methodName: mm.name,
+              descriptor: mm.descriptor,
+              message: errorMessage(e),
+            });
+          }
         }
-      }
+        return lines;
+      };
       this.anonClasses.set(name, {
         superInternal,
         dropFirstArg,
         captureFields,
         superArgIndices,
-        memberLines: lines,
+        renderMembers,
       });
     }
     for (const [name, cf] of this.ctx.classes) {
@@ -239,6 +248,7 @@ export const anonPart: ThisType<ClassGenerator> &
     const sig = buildMethodSig(this.ctx, cf, mm);
     const mods: string[] = [];
     if (mm.access & 0x0001) mods.push('public');
+    if (mm.access & Acc.Synchronized) mods.push('synchronized');
     if (mm.access & 0x0010 && mm.name !== '<init>') mods.push('final');
     if (
       cf.access & 0x0200 &&

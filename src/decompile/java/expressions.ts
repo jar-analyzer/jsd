@@ -11,26 +11,37 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
       receiver?.kind === 'class' &&
       !receiver.args?.length &&
       !ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
-    return {
-      ...e,
-      args: e.args.map((arg, i) =>
-        adaptCallArgument(
-          arg,
-          e.descriptor,
-          i,
-          ctx,
-          e.owner,
-          e.name,
-          raw,
-          e.mode === 'static' || raw,
-        ),
+    const args = e.args.map((arg, i) =>
+      adaptCallArgument(
+        arg,
+        e.descriptor,
+        i,
+        ctx,
+        e.owner,
+        e.name,
+        raw,
+        e.mode === 'static' || raw,
       ),
-    };
+    );
+    const target =
+      e.target &&
+      raw &&
+      !ctx.lookup(e.owner) &&
+      args.some((arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim')
+        ? {
+            kind: 'cast' as const,
+            jtype: { kind: 'class' as const, name: e.owner },
+            expr: e.target,
+          }
+        : e.target;
+    return { ...e, target, args };
   }
   if (e.kind === 'new')
     return {
       ...e,
-      args: e.args.map((arg, i) => adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, '<init>')),
+      args: e.args.map((arg, i) =>
+        adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, '<init>', false, true),
+      ),
     };
   if (e.kind === 'assign-expr' && e.target.kind === 'field') {
     const type = ctx.fieldTypeInfo(e.target.owner, e.target.name);

@@ -1,3 +1,4 @@
+import type { AnonInfo } from '../printer/context.js';
 import {
   diagnosticStatus,
   type DecompileDiagnostic,
@@ -46,16 +47,7 @@ export class ClassGenerator {
   out: string[] = [];
   refs = new Set<string>();
   nameResolver: (internal: string) => string = (n) => nestedDisplay(n);
-  anonClasses = new Map<
-    string,
-    {
-      superInternal: string;
-      dropFirstArg: boolean;
-      captureFields?: { name: string; displayName: string; index: number; type: JType }[];
-      superArgIndices?: number[];
-      memberLines: string[];
-    }
-  >();
+  anonClasses = new Map<string, AnonInfo>();
   localClasses = new Map<string, { simpleName: string; dropFirstArg: boolean }>();
   isEnum = false;
   isInterface = false;

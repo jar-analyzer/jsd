@@ -1,7 +1,7 @@
 import type { JType } from '../classfile/types.js';
 
 export type Expr =
-  | { kind: 'local'; slot: number; name: string; jtype?: JType }
+  | { kind: 'local'; slot: number; name: string; jtype?: JType; temporary?: boolean }
   | { kind: 'this' }
   | { kind: 'super' }
   | { kind: 'outer-this'; owner: string }
@@ -100,7 +100,7 @@ export type BinOp =
 export type UnaryOp = '-' | '!' | '~' | '+' | '++x' | '--x' | 'x++' | 'x--';
 
 export type AssignTarget =
-  | { kind: 'local'; slot: number; name: string; jtype?: JType }
+  | { kind: 'local'; slot: number; name: string; jtype?: JType; temporary?: boolean }
   | { kind: 'field'; owner: string; name: string; target?: Expr }
   | { kind: 'array'; array: Expr; index: Expr };
 

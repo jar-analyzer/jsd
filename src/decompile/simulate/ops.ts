@@ -361,6 +361,37 @@ export const opsPart: ThisType<Simulator> &
       if (nm !== 'invokestatic') {
         const target = stack.pop();
         if (ref.name === '<init>' && target.kind === 'new-uninit') {
+          const anonymous = this.ctx.lookup(target.owner);
+          if (
+            anonymous?.enclosing &&
+            anonymous.innerClasses.some(
+              (inner) => inner.inner === anonymous.name && !inner.innerName,
+            )
+          ) {
+            for (let i = 0; i < stack.items.length; i++) {
+              const entry = stack.items[i];
+              entry.e = this.preserveDiscarded(entry.e, ins.pc, i, stmts, true);
+            }
+            const names = new Set<string>();
+            for (const cls of this.ctx.classes.values()) {
+              for (const field of cls.fields) names.add(field.name);
+              for (const method of cls.methods) {
+                for (const variable of method.code?.localVars ?? []) names.add(variable.name);
+                for (const parameter of method.methodParameters ?? [])
+                  if (parameter.name) names.add(parameter.name);
+              }
+            }
+            for (let i = 0; i < args.length; i++) {
+              const value = this.preserveDiscarded(args[i], ins.pc, stack.depth + i, stmts, true);
+              if (value.kind === 'local' && value !== args[i]) {
+                let name = `$jsd$capture${value.slot}`;
+                while (names.has(name)) name += '$';
+                names.add(name);
+                value.name = name;
+              }
+              args[i] = value;
+            }
+          }
           const newExpr = this.buildNew(target.owner, args, ref.descriptor);
           this.replaceUninit(stack, stmts, target.uid, newExpr);
           if (returns) stack.push(newExpr);

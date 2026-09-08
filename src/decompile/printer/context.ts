@@ -6,7 +6,7 @@ export {
   declareSlot,
 } from '../java/scope.js';
 import type { ScopeContext } from '../java/scope.js';
-import { BinOp, Stmt } from '../../ast/ast.js';
+import { BinOp, Stmt, Expr } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import type { Ctx } from '../context.js';
 import { decodeBytecode } from '../../bytecode/decode.js';
@@ -77,7 +77,7 @@ export interface RenderCtx extends ScopeContext {
   nameResolver?: (internal: string) => string;
   lambdaResolver?: (e: import('../../ast/ast.js').Expr) => string | null;
   slotLvtTypes?: Map<number, JType[]>;
-  fieldNames?: ReadonlyMap<string, string>;
+  fieldValues?: ReadonlyMap<string, Expr>;
   anonClasses?: Map<string, AnonInfo>;
   localClasses?: Map<string, { simpleName: string; dropFirstArg: boolean }>;
 }
@@ -85,9 +85,9 @@ export interface RenderCtx extends ScopeContext {
 export interface AnonInfo {
   superInternal: string;
   dropFirstArg: boolean;
-  captureFields?: { name: string; displayName: string; index: number; type: JType }[];
+  captureFields?: { name: string; index: number; type: JType }[];
   superArgIndices?: number[];
-  memberLines: string[];
+  renderMembers: (captures: ReadonlyMap<string, Expr>) => string[];
 }
 
 export function renderBlock(stmts: Stmt[], rc: RenderCtx, indent: number): string[] {

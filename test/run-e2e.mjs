@@ -123,8 +123,18 @@ function runOne(fx, name) {
   checkExpectations(fixturesDir, name, join(work, 'orig'), r1.out, parseClass);
 
   const classFiles = readdirSync(join(work, 'orig')).filter((f) => f.endsWith('.class'));
+  const expectationPath = join(fixturesDir, name + '.expected.json');
+  const dependencies = new Set(
+    existsSync(expectationPath)
+      ? (JSON.parse(readFileSync(expectationPath, 'utf8')).dependencies ?? [])
+      : [],
+  );
   const map = new Map();
   for (const cf of classFiles) {
+    if (dependencies.has(cf)) {
+      writeFileSync(join(work, 'rt', cf), readFileSync(join(work, 'orig', cf)));
+      continue;
+    }
     map.set(cf, new Uint8Array(readFileSync(join(work, 'orig', cf))));
   }
   let sources;

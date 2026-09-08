@@ -306,7 +306,7 @@ export class Simulator {
           binding = {
             target: block.id,
             position,
-            local: { kind: 'local', slot, name: `r${slot}`, jtype },
+            local: { kind: 'local', slot, name: `r${slot}`, jtype, temporary: true },
           };
           this.mergeBindings.set(key, binding);
           this.fixedTargets.add(block.id);

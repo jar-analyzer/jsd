@@ -1,6 +1,6 @@
 import type { Expr } from '../ast/ast.js';
 import { expressionType } from '../ast/types.js';
-import { parseMethodDescriptor, type JType } from '../classfile/types.js';
+import { parseClassSignature, parseMethodDescriptor, type JType } from '../classfile/types.js';
 import type { Ctx } from './context.js';
 
 export function adaptCallArgument(
@@ -14,7 +14,8 @@ export function adaptCallArgument(
   allowUnknownOverloads = false,
 ): Expr {
   if (!descriptor) return a;
-  const pt = parseMethodDescriptor(descriptor).params[i];
+  const signature = parseMethodDescriptor(descriptor);
+  const pt = signature.params[i];
   const at = expressionType(a);
   if (!pt) return a;
   if (pt.kind === 'prim') return adaptPrimitiveValue(a, pt);
@@ -33,13 +34,31 @@ export function adaptCallArgument(
       name,
       descriptor,
       i,
-      allowUnknownOverloads && (at?.kind === 'array' || (a.kind === 'const' && a.ctype === 'null')),
+      allowUnknownOverloads &&
+        (rawReceiver ||
+          nonGenericReturn(signature.ret, ctx) ||
+          (pt.kind !== 'array' &&
+            (at?.kind === 'array' || (a.kind === 'const' && a.ctype === 'null')))),
     ) &&
     (!at || erasedType(at) !== erasedType(pt))
   ) {
     return { kind: 'cast', jtype: pt, expr: a };
   }
   return a;
+}
+
+function nonGenericReturn(type: JType, ctx: Ctx): boolean {
+  if (type.kind === 'prim') return true;
+  if (type.kind !== 'class' || type.name === 'java/lang/Object') return false;
+  if (['java/lang/String', 'java/lang/StringBuilder', 'java/lang/StringBuffer'].includes(type.name))
+    return true;
+  const cls = ctx.lookup(type.name);
+  if (!cls) return false;
+  try {
+    return !cls.signature || parseClassSignature(cls.signature).typeParams.length === 0;
+  } catch {
+    return false;
+  }
 }
 
 function erasedType(t: JType): string {
@@ -60,7 +79,7 @@ function hasReferenceOverload(
     if (visited.has(cn)) return false;
     visited.add(cn);
     const cf = ctx.lookup(cn);
-    if (!cf) return allowUnknown && cn === owner && wanted.params[index]?.kind !== 'array';
+    if (!cf) return allowUnknown && cn === owner;
     for (const m of cf.methods) {
       if (m.name !== name || m.descriptor === descriptor || m.access & 0x1040) continue;
       const md = parseMethodDescriptor(m.descriptor);

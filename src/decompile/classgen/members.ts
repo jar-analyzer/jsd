@@ -62,7 +62,7 @@ function readExpectsBool(
   return firstReadExpectsBoolean(stmts, slot, {
     retIsBoolean: retBool,
     slotIsBoolean: (s) => s !== slot && isPrimBoolT(ctx.slotInferredType(m, s)),
-    fieldIsBoolean: () => false,
+    fieldIsBoolean: (owner, name) => isPrimBoolT(ctx.fieldTypeInfo(owner, name)),
     ctorParamBoolean: () => false,
   });
 }

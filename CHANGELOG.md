@@ -5,10 +5,11 @@
 - Improve dynamic bytecode support.
 - Improve lambda and method reference recovery.
 - Preserve field access and overload semantics.
-- Restore anonymous class initialization and captures.
+- Preserve expression evaluation order.
+- Preserve anonymous class initialization and locking behavior.
 - Improve generic and sealed type recovery.
 - Avoid misidentifying compiler-generated code.
-- Correct boolean branch recovery.
+- Correct conditional branch recovery.
 - Strengthen class-file and bytecode validation.
 - Add configurable resource limits.
 - Refine the demo.

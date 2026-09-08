@@ -78,7 +78,7 @@ export function applyPatterns(
   out = foldTernary(out, sim, bctx);
   out = foldBoolTernary(out);
   for (let i = 0; i < 6; i++) {
-    const next = propagateTemps(out, bctx);
+    const next = propagateTemps(out);
     if (next === out) break;
     out = next;
   }

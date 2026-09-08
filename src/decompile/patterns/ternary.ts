@@ -42,6 +42,9 @@ function tryFoldTernaryAt(s: Stmt, rest: Stmt[], bctx?: BoolFoldCtx): TernaryFol
   const [tSlot, tName, tExpr] = thenA;
   const [eSlot, , eExpr] = elseA;
   if (tSlot !== eSlot) return null;
+  const next = rest[0];
+  if (next?.kind !== 'return' || next.expr?.kind !== 'local' || next.expr.slot !== eSlot)
+    return null;
   void tName;
   const writes = countSlotUses(rest, eSlot);
   if (writes.writes !== 0 || writes.reads !== 1) return null;
@@ -400,7 +403,14 @@ export function firstReadExpectsBoolean(list: Stmt[], slot: number, bctx: BoolFo
         break;
       }
       case 'new':
-        e.args.forEach((a, i) => checkExpr(a, bctx.ctorParamBoolean(e.owner, i, e.args.length)));
+        e.args.forEach((a, i) =>
+          checkExpr(
+            a,
+            e.descriptor
+              ? paramBool(e.descriptor, i)
+              : bctx.ctorParamBoolean(e.owner, i, e.args.length),
+          ),
+        );
         if (e.outer) checkExpr(e.outer, false);
         break;
       case 'new-array':

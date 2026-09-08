@@ -119,16 +119,21 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         const args = (anon.superArgIndices ?? []).map((index) =>
           exprStr(e.args[index], rc, PREC.lambda),
         );
-        const captureLines = (anon.captureFields ?? []).map((capture) => {
+        const captureValues = new Map<string, Expr>();
+        for (const capture of anon.captureFields ?? []) {
           const value = structuredClone(e.args[capture.index]);
           if (!value) throw new Error('Missing anonymous capture argument');
           walkExpr(value, (expr) => {
             if (expr.kind === 'this')
               Object.assign(expr, { kind: 'outer-this', owner: rc.className });
           });
-          return `    private final ${typeStr(capture.type, rc)} ${capture.displayName} = ${exprStr(value, rc, PREC.assign)};`;
-        });
-        const bodyLines = [...captureLines, ...anon.memberLines];
+          captureValues.set(e.owner + '#' + capture.name, {
+            kind: 'raw',
+            text: exprStr(value, rc, PREC.postfix),
+            jtype: capture.type,
+          });
+        }
+        const bodyLines = anon.renderMembers(captureValues);
         const body = bodyLines.map((l) => (l ? '    ' + l : l)).join('\n');
         return [`new ${superDisplay}(${args.join(', ')}) {\n${body}\n}`, PREC.postfix - 2];
       }
@@ -180,7 +185,10 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       return [`${arr}[${idx}]`, PREC.postfix];
     }
     case 'field-get': {
-      const fieldName = rc.fieldNames?.get(e.owner + '#' + e.name) ?? e.name;
+      const captured =
+        e.target?.kind === 'this' ? rc.fieldValues?.get(e.owner + '#' + e.name) : undefined;
+      if (captured) return [exprStr(captured, rc, PREC.postfix), PREC.postfix];
+      const fieldName = e.name;
       if (e.target) {
         if (
           e.name.startsWith('this$') &&
@@ -308,7 +316,7 @@ function assignTargetStr(t: AssignTarget, rc: RenderCtx): string {
     case 'local':
       return lookupDeclared(rc, t.slot) ?? t.name;
     case 'field': {
-      const fieldName = rc.fieldNames?.get(t.owner + '#' + t.name) ?? t.name;
+      const fieldName = t.name;
       if (t.target) {
         if (t.target.kind === 'this' && t.owner === rc.className) return `this.${fieldName}`;
         return `${fieldReceiver(t.target, t.owner, t.name, rc)}.${fieldName}`;

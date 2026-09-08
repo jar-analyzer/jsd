@@ -3,7 +3,7 @@ import { splitLocalSlots } from './locals.js';
 import { errorMessage, type DiagnosticStage } from './diagnostics.js';
 import { Stmt } from '../ast/ast.js';
 import { buildCFG } from '../bytecode/cfg.js';
-import { decodeBytecode, Instr } from '../bytecode/decode.js';
+import { branchSuccessors, decodeBytecode, Instr } from '../bytecode/decode.js';
 import type { ClassFile, MethodInfo } from '../classfile/model.js';
 import { opName } from '../classfile/opcodes.js';
 import { Ctx } from './context.js';
@@ -26,7 +26,13 @@ function constPushValue(ins: Instr): number | null {
   return null;
 }
 
-function foldConstBranches(instrs: Instr[]): Instr[] {
+function foldConstBranches(instrs: Instr[], method: MethodInfo): Instr[] {
+  const entries = new Set([
+    ...instrs.flatMap(branchSuccessors),
+    ...(method.code?.exceptions.flatMap((entry) => [entry.startPc, entry.endPc, entry.handlerPc]) ??
+      []),
+    ...(method.code?.stackMapFrames?.map((frame) => frame.offset) ?? []),
+  ]);
   const out: Instr[] = [];
   for (let i = 0; i < instrs.length; i++) {
     const ins = instrs[i];
@@ -34,12 +40,13 @@ function foldConstBranches(instrs: Instr[]): Instr[] {
     const v = prev ? constPushValue(prev) : null;
     if (
       v !== null &&
+      !entries.has(ins.pc) &&
       (ins.op === 0x99 || ins.op === 0x9a) &&
       ins.branch !== undefined &&
       instrs[i - 1] === prev
     ) {
       const take = ins.op === 0x99 ? v === 0 : v !== 0;
-      out.pop();
+      out[out.length - 1] = { pc: prev.pc, op: 0x00, name: 'nop', size: prev.size };
       out.push({
         ...ins,
         op: 0xa7,
@@ -101,7 +108,7 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
     ctx.budget.check(code.code.length);
     instrs = decodeBytecode(code.code);
     validateStackMaps(method, instrs);
-    instrs = foldConstBranches(instrs);
+    instrs = foldConstBranches(instrs, method);
   } catch (e) {
     return {
       stmts: [],
@@ -218,7 +225,7 @@ export function disassemble(method: MethodInfo): string {
   if (!code) return '(no code)';
   const lines: string[] = [];
   try {
-    const instrs = foldConstBranches(decodeBytecode(code.code));
+    const instrs = foldConstBranches(decodeBytecode(code.code), method);
     for (const ins of instrs) {
       let operand = '';
       if (ins.local !== undefined) operand = ` ${ins.local}`;

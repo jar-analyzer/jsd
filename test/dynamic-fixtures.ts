@@ -7,8 +7,25 @@ export function dynamicFixtures() {
     bytes: Uint8Array;
     expected: string;
     minJava?: number;
-    mode?: 'identity' | 'error' | 'concat' | 'concat-error' | 'booleans';
+    mode?: 'identity' | 'error' | 'concat' | 'concat-error' | 'booleans' | 'integers';
   }[] = [];
+  {
+    const name = 'ConstantBranchJoin';
+    const bytes = new DynamicClassBuilder(name).build(
+      [0x1a, 0xa7, 0, 4, 0x03, 0x99, 0, 5, 0x04, 0xac, 0x05, 0xac],
+      '(I)I',
+    );
+    bytes[7] = 49;
+    cases.push({ name, bytes, expected: '2:1', mode: 'integers' });
+  }
+  for (const [name, code] of [
+    ['ConstantBranchFallthrough', [0x03, 0x99, 0, 5, 0x04, 0xac, 0x05, 0xac]],
+    ['ConstantBranchEntry', [0xa7, 0, 3, 0x03, 0x99, 0, 5, 0x04, 0xac, 0x05, 0xac]],
+  ] as const) {
+    const bytes = new DynamicClassBuilder(name).build([...code], '()I');
+    bytes[7] = 49;
+    cases.push({ name, bytes, expected: '2' });
+  }
   for (const [suffix, opcode, expected] of [
     ['Eq', 0x99, '1:0'],
     ['Ne', 0x9a, '0:1'],
