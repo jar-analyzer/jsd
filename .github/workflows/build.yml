@@ -27,7 +27,7 @@ jobs:
       - name: Generate checksum
         working-directory: release
         run: sha256sum *.tgz > SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: jsd-production-${{ github.sha }}-${{ github.run_attempt }}
           path: |
