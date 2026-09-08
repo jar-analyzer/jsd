@@ -45,7 +45,14 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
   const indyDesc = parseMethodDescriptor(e.descriptor);
   const samName = marker.name ?? 'apply';
 
-  if (!ref.name.startsWith('lambda$')) {
+  const implementation = rc.ctx
+    .lookup(ref.owner)
+    ?.methods.find((m) => m.name === ref.name && m.descriptor === ref.descriptor);
+  if (
+    !ref.name.startsWith('lambda$') ||
+    !implementation ||
+    !(implementation.synthetic || implementation.access & 0x1000)
+  ) {
     if (e.erasedLambda && bm.args[0]?.kind === 'methodType') {
       const instantiated = bm.args[2];
       if (instantiated?.kind === 'methodType')

@@ -1,3 +1,4 @@
+import { cachedConcat } from './concat.js';
 import { Expr, Stmt } from '../../ast/ast.js';
 import { Instr } from '../../bytecode/decode.js';
 import type { BootstrapMethod } from '../../classfile/model.js';
@@ -63,7 +64,16 @@ function validateLambda(
     impl.handle.kind > 9
   )
     invalid('Invalid lambda implementation handle or parameter counts');
-  if (!impl.handle.ref.name.startsWith('lambda$') && capturedCount > receiver)
+  const implementation = sim.ctx
+    .lookup(impl.handle.ref.owner)
+    ?.methods.find(
+      (m) => m.name === impl.handle.ref.name && m.descriptor === impl.handle.ref.descriptor,
+    );
+  const lambdaBody =
+    impl.handle.ref.name.startsWith('lambda$') &&
+    implementation &&
+    (implementation.synthetic || implementation.access & 0x1000);
+  if (!lambdaBody && capturedCount > receiver)
     throw new ConstantResolutionError(
       'Captured implementation arguments cannot be represented as a Java method reference',
       'UNSUPPORTED_INVOKEDYNAMIC',
@@ -206,6 +216,10 @@ function execute(this: Simulator, ins: Instr, stack: ExprStack, stmts: Stmt[]): 
       [...recipe].filter((c) => c === '\u0002').length !== constants.length
     )
       invalid('Concat recipe placeholder counts do not match its arguments');
+    if (constants.some((arg) => arg.kind === 'dynamic')) {
+      stack.push(cachedConcat(this, ins, d.descriptor, args, recipe, constants));
+      return;
+    }
     const parts: Expr[] = [];
     const partTypes: (JType | undefined)[] = [];
     let argI = 0,

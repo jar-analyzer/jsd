@@ -7,7 +7,7 @@ export function dynamicFixtures() {
     bytes: Uint8Array;
     expected: string;
     minJava?: number;
-    mode?: 'identity' | 'error';
+    mode?: 'identity' | 'error' | 'concat' | 'concat-error';
   }[] = [];
   for (const [name, bootstrapName, constantName, descriptor, expected] of [
     ['DynamicNull', 'nullConstant', 'nil', 'Ljava/lang/String;', 'null'],
@@ -253,6 +253,73 @@ export function dynamicFixtures() {
         ],
         '()Ljava/util/function/Supplier;',
       ),
+    });
+  }
+  for (const name of [
+    'ConcatStaticOnce',
+    'ConcatSeparateSites',
+    'ConcatConversionFailure',
+    'ConcatNullFinal',
+  ]) {
+    const b = new DynamicClassBuilder(name);
+    const valueBootstrap = b.bootstrap(
+      b.handle(
+        'java/lang/invoke/ConstantBootstraps',
+        'getStaticFinal',
+        bootstrapDescriptors.getStaticFinalExplicit,
+      ),
+      [b.classRef('ConcatState')],
+    );
+    const constant = b.dynamic(
+      17,
+      valueBootstrap,
+      name === 'ConcatNullFinal' ? 'NULL_VALUE' : 'VALUE',
+      'Ljava/lang/Object;',
+    );
+    const concatBootstrap = b.bootstrap(
+      b.handle(
+        'java/lang/invoke/StringConcatFactory',
+        'makeConcatWithConstants',
+        bootstrapDescriptors.makeConcatWithConstants,
+      ),
+      [b.string('\u0002'), constant],
+    );
+    const call = b.dynamic(18, concatBootstrap, 'concat', '()Ljava/lang/String;');
+    let code = indy(call);
+    if (name === 'ConcatSeparateSites') {
+      const joinBootstrap = b.bootstrap(
+        b.handle(
+          'java/lang/invoke/StringConcatFactory',
+          'makeConcatWithConstants',
+          bootstrapDescriptors.makeConcatWithConstants,
+        ),
+        [b.string('\u0001/\u0001')],
+      );
+      const join = b.dynamic(
+        18,
+        joinBootstrap,
+        'concat',
+        '(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;',
+      );
+      code = [...code, ...indy(call), ...indy(join)];
+    }
+    cases.push({
+      name,
+      bytes: b.build([...code, 0xb0], '()Ljava/lang/String;'),
+      mode:
+        name === 'ConcatConversionFailure'
+          ? 'concat-error'
+          : name === 'ConcatNullFinal'
+            ? 'error'
+            : 'concat',
+      expected:
+        name === 'ConcatStaticOnce'
+          ? 'before:1|before:1|1'
+          : name === 'ConcatSeparateSites'
+            ? 'before:1/before:2|before:1/before:2|2'
+            : name === 'ConcatNullFinal'
+              ? 'java.lang.BootstrapMethodError'
+              : 'java.lang.BootstrapMethodError:1',
     });
   }
   return cases;

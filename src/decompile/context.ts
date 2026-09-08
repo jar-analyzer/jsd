@@ -81,13 +81,17 @@ export const JAVA_KEYWORDS = new Set([
 ]);
 
 export class Ctx {
+  readonly dynamicConcats = new Map<
+    ClassFile,
+    Map<string, { name: string; handleName: string; params: JType[] }>
+  >();
   readonly dynamicSwitches = new Map<
     ClassFile,
     Map<number, { name: string; handleName: string; selector: JType }>
   >();
   readonly dynamicConstants = new Map<
     ClassFile,
-    Map<number, { name: string; expr: Expr; type: JType }>
+    Map<number | string, { name: string; expr: Expr; type: JType }>
   >();
   readonly classes: Map<string, ClassFile>;
   readonly opts: DecompileOptions;

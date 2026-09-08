@@ -37,13 +37,38 @@ if (major < 11) {
       recovered = join(work, 'recovered');
     mkdirSync(original);
     mkdirSync(recovered);
+    const support = join(work, 'ConcatState.java');
+    writeFileSync(
+      support,
+      `public class ConcatState {
+      public static int calls;
+      public static String label = "before";
+      public static boolean fail;
+      public static final Object NULL_VALUE = null;
+      public static final Object VALUE = new Object() {
+        public String toString() {
+          calls++;
+          if (fail) throw new IllegalStateException("conversion failed");
+          return label + ":" + calls;
+        }
+      };
+    }`,
+    );
     const harness = join(work, 'RunDynamic.java');
     writeFileSync(
       harness,
       `public class RunDynamic {
         public static void main(String[] args) throws Exception {
           java.lang.reflect.Method method = Class.forName(args[0]).getMethod("value");
-          if (args.length > 1 && args[1].equals("error")) {
+          if (args.length > 1 && args[1].equals("concat")) {
+            Object first = method.invoke(null);
+            ConcatState.label = "after";
+            Object second = method.invoke(null);
+            System.out.print(first + "|" + second + "|" + ConcatState.calls);
+            return;
+          }
+          if (args.length > 1 && args[1].equals("concat-error")) ConcatState.fail = true;
+          if (args.length > 1 && (args[1].equals("error") || args[1].equals("concat-error"))) {
             String type = null;
             for (int i = 0; i < 2; i++) {
               try { method.invoke(null); throw new AssertionError("Expected resolution failure"); }
@@ -53,7 +78,7 @@ if (major < 11) {
                 type = actual;
               }
             }
-            System.out.print(type);
+            System.out.print(type + (args[1].equals("concat-error") ? ":" + ConcatState.calls : ""));
             return;
           }
           Object value = method.invoke(null);
@@ -75,7 +100,7 @@ if (major < 11) {
         }
       }`,
     );
-    for (const dir of [original, recovered]) run('javac', ['-d', dir, harness]);
+    for (const dir of [original, recovered]) run('javac', ['-d', dir, support, harness]);
     const cases = dynamicFixtures().filter((fixture) => (fixture.minJava ?? 11) <= major);
     for (const { name, bytes, expected, mode } of cases) {
       writeFileSync(join(original, `${name}.class`), bytes);
@@ -85,7 +110,7 @@ if (major < 11) {
       assert.equal(result.status, 'success', `${name}: ${JSON.stringify(result.diagnostics)}`);
       const source = join(recovered, `${name}.java`);
       writeFileSync(source, result.source);
-      run('javac', ['-d', recovered, source]);
+      run('javac', ['-cp', recovered, '-d', recovered, source]);
       assert.equal(
         run('java', ['-cp', recovered, 'RunDynamic', name, mode ?? 'value']),
         actual,

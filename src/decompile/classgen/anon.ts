@@ -35,7 +35,11 @@ export const anonPart: ThisType<ClassGenerator> &
       }
       for (const mm of cf.methods) {
         if (mm.name === '<init>' || mm.synthetic || (mm.access & 0x0040) !== 0) continue;
-        if (mm.name.startsWith('access$') || mm.name.startsWith('lambda$')) continue;
+        if (
+          (mm.access & 0x1000) !== 0 &&
+          (mm.name.startsWith('access$') || mm.name.startsWith('lambda$'))
+        )
+          continue;
         const body = decompileMethod(this.ctx, cf, mm);
         if (!body || body.failed) continue;
         const mrc = this.methodRenderCtxFor(cf, mm);

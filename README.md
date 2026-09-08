@@ -11,9 +11,9 @@
 
 A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers as a single ESM bundle, with no runtime dependencies or WebAssembly.
 
-**Small enough to drop straight into your page: just one ~217 KB JavaScript file (~65 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
+**Small enough to drop straight into your page: just one ~220 KB JavaScript file (~66 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
 
-Size measured from the current minified `dist/jsd.min.js` bundle (~217 KB (0.217 MB) before gzip; ~65 KB (0.065 MB) after gzip).
+Size measured from the current minified `dist/jsd.min.js` bundle (~220 KB (0.220 MB) before gzip; ~66 KB (0.066 MB) after gzip).
 
 [Try the live demo](https://jar-analyzer.github.io/jsd/)
 
@@ -60,9 +60,13 @@ const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);
 ```
 
-The development version also accepts `maxInputBytes` (bytes per class), `maxWork` (bytecode bytes and processing steps), `maxOutputChars`, `timeoutMs`, and `signal`. Limits are opt-in. Single-class calls throw `DecompileLimitError`; batch reports include `RESOURCE_LIMIT` or `DECOMPILE_CANCELLED` diagnostics. Work, time and output budgets are shared by a batch and reset for each decompilation operation.
+Input size is unlimited by default. To limit each `.class` file to 10 MB:
 
-These checks are cooperative: use a Worker for interrupting synchronous work from another thread. `success` means no reported errors, not verified compilation or semantic equivalence.
+```js
+const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
+```
+
+Oversized files raise an error. Batch processing records the error and continues with other files.
 
 ## Testing
 

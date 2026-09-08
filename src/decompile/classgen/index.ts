@@ -238,6 +238,23 @@ export class ClassGenerator {
   }
 
   renderDynamicConstants(): void {
+    for (const { name, handleName, params } of this.ctx.dynamicConcats.get(this.cls)?.values() ??
+      []) {
+      const declarations = params.map((type, i) => `${this.renderType(type)} arg${i}`).join(', ');
+      const args = params.map((_, i) => `arg${i}`).join(', ');
+      this.out.push(`
+    private static java.lang.String ${name}(${declarations}) {
+        try {
+            return (java.lang.String) ${handleName}().invokeExact(${args});
+        } catch (java.lang.RuntimeException | java.lang.Error error) {
+            throw error;
+        } catch (java.lang.Throwable error) {
+            throw new java.lang.AssertionError(error);
+        }
+    }
+`);
+    }
+
     for (const { name, handleName, selector } of this.ctx.dynamicSwitches.get(this.cls)?.values() ??
       []) {
       this.out.push(`

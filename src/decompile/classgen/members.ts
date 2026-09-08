@@ -156,8 +156,9 @@ export const membersPart: ThisType<ClassGenerator> &
 
   shouldSkipMethod(m: MethodInfo): boolean {
     if (m.name === '<clinit>') return false;
-    if (m.name.startsWith('lambda$')) return true;
     const a = m.access;
+    const synthetic = m.synthetic || (a & Acc.Synthetic) !== 0;
+    if (synthetic && m.name.startsWith('lambda$')) return true;
     if (
       m.name === '$deserializeLambda$' &&
       m.descriptor === '(Ljava/lang/invoke/SerializedLambda;)Ljava/lang/Object;' &&
@@ -171,7 +172,8 @@ export const membersPart: ThisType<ClassGenerator> &
       if ((a & Acc.Bridge) !== 0) return true;
       if (m.synthetic && m.name !== '<init>') return true;
     }
-    if (m.name.startsWith('access$') || m.name.startsWith('$SWITCH_TABLE$')) return true;
+    if (synthetic && (m.name.startsWith('access$') || m.name.startsWith('$SWITCH_TABLE$')))
+      return true;
     if (this.isEnum && (m.name === 'values' || m.name === 'valueOf') && a & Acc.Static) {
       if (m.name === 'values' && m.descriptor === '()[L' + this.cls.name + ';') return true;
       if (m.name === 'valueOf' && m.descriptor === `(Ljava/lang/String;)L${this.cls.name};`)
