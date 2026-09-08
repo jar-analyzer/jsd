@@ -19,13 +19,13 @@ Supports common control flow, lambdas, nested classes, records and selected synt
 
 ### 1. Browser
 
-Save this page in the repository root and serve it over HTTP. Choose a `.class` file to view its source.
+Load from the CDN and choose a `.class` file to view its source.
 
 ```html
 <input type="file" accept=".class" />
 <pre id="source"></pre>
 <script type="module">
-  import { decompileClassFile } from './dist/jsd.min.js';
+  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.0.3/dist/jsd.min.js';
 
   document.querySelector('input').onchange = async (event) => {
     const file = event.target.files[0];
@@ -38,11 +38,15 @@ Save this page in the repository root and serve it over HTTP. Choose a `.class` 
 
 ### 2. Node.js
 
-Save as `example.mjs` in the repository root and run `node example.mjs`:
+```sh
+npm i @jar-analyzer/jsd
+```
+
+Save as `example.mjs` and run `node example.mjs`:
 
 ```js
 import { readFileSync } from 'node:fs';
-import { decompileClassFile } from './dist/jsd.min.js';
+import { decompileClassFile } from '@jar-analyzer/jsd';
 
 const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);

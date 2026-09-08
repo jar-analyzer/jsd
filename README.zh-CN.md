@@ -19,13 +19,13 @@ TypeScript 实现的 Java `.class` 反编译库。以单个 ESM 产物运行于 
 
 ### 1. 浏览器
 
-将以下网页保存到仓库根目录，通过 HTTP 访问。选择 `.class` 文件即可查看源码。
+通过 CDN 加载，选择 `.class` 文件即可查看源码。
 
 ```html
 <input type="file" accept=".class" />
 <pre id="source"></pre>
 <script type="module">
-  import { decompileClassFile } from './dist/jsd.min.js';
+  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.0.3/dist/jsd.min.js';
 
   document.querySelector('input').onchange = async (event) => {
     const file = event.target.files[0];
@@ -38,11 +38,15 @@ TypeScript 实现的 Java `.class` 反编译库。以单个 ESM 产物运行于 
 
 ### 2. Node.js
 
-在仓库根目录保存为 `example.mjs`，运行 `node example.mjs`：
+```sh
+npm i @jar-analyzer/jsd
+```
+
+保存为 `example.mjs`，运行 `node example.mjs`：
 
 ```js
 import { readFileSync } from 'node:fs';
-import { decompileClassFile } from './dist/jsd.min.js';
+import { decompileClassFile } from '@jar-analyzer/jsd';
 
 const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);
