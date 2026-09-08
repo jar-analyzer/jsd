@@ -15,13 +15,15 @@ A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers a
 
 Size measured from the current minified `dist/jsd.min.js` bundle (~196 KB (0.196 MB) before gzip; ~59 KB (0.059 MB) after gzip).
 
-[Try the live demo](https://jar-analyzer.github.io/jsd/) · [GitHub source](https://github.com/jar-analyzer/jsd)
+[Try the live demo](https://jar-analyzer.github.io/jsd/)
 
 It will serve as the underlying decompilation engine for the next generation of **jar-analyzer**.
 
 Supports common control flow, lambdas, nested classes, records and selected syntax through Java 25.
 
 ## Usage
+
+Published on npm as [`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd), currently at version **1.0.3**.
 
 ### 1. Browser
 

@@ -165,13 +165,39 @@
           <p data-i18n="welcomeHint">
             Open a class or archive, then explore its source. No installation or upload required.
           </p>
-          <p class="bundle-size" data-i18n="bundleSize">
-            Just one ~196 KB JS file (~59 KB gzipped). No runtime dependencies or WebAssembly.
-          </p>
-          <p class="project-link">
-            <span data-i18n="githubSource">Open source on GitHub:</span>
-            <a href="https://github.com/jar-analyzer/jsd">github.com/jar-analyzer/jsd</a>
-          </p>
+          <section class="library-info" data-i18n-aria="libraryInfo">
+            <div class="library-heading">
+              <span class="js-file-icon" aria-hidden="true">JS</span>
+              <span>jsd.min.js</span>
+              <span class="library-format">ESM</span>
+            </div>
+            <div class="library-metrics">
+              <div>
+                <span data-i18n="bundleLabel">Minified JS</span>
+                <strong>~196 <small>KB</small></strong>
+                <small>0.196 MB</small>
+              </div>
+              <div>
+                <span data-i18n="gzipLabel">With gzip</span>
+                <strong>~59 <small>KB</small></strong>
+                <small>0.059 MB</small>
+              </div>
+              <div>
+                <span data-i18n="dependenciesLabel">Runtime dependencies</span>
+                <strong>0</strong>
+                <small data-i18n="noWasm">No WebAssembly</small>
+              </div>
+            </div>
+            <p class="library-caption" data-i18n="bundleHint">
+              One JS file is all you need to decompile .class files in Node.js or your browser.
+            </p>
+            <a class="project-link" href="https://github.com/jar-analyzer/jsd">
+              <span data-i18n="githubSource">Source on GitHub</span>
+              <span class="project-address"
+                >github.com/jar-analyzer/jsd <span aria-hidden="true">↗</span></span
+              >
+            </a>
+          </section>
           <div class="welcome-steps">
             <span data-i18n="stepOpen">01 · Open files</span
             ><span data-i18n="stepSelect">02 · Select a class</span
@@ -212,7 +238,13 @@
       <span class="remote-mark" aria-hidden="true">&gt;&lt;</span><span id="statFiles"></span
       ><span id="statCache"></span><span class="spacer"></span
       ><span class="local-status" data-i18n="localNote">Your files stay in this browser.</span
-      ><span>Java</span><span>UTF-8</span>
+      ><span class="status-bundle" data-i18n-title="bundleHint">JS ~196 KB · gzip ~59 KB</span
+      ><a
+        class="status-github"
+        href="https://github.com/jar-analyzer/jsd"
+        data-i18n-title="githubSource"
+        >GitHub ↗</a
+      >
     </footer>
     <dialog id="quickOpen" data-i18n-aria="quickOpen">
       <div class="quick-header">

@@ -15,13 +15,15 @@ TypeScript 实现的 Java `.class` 反编译库。以单个 ESM 产物运行于 
 
 体积基于当前压缩后的 `dist/jsd.min.js` 实测：gzip 前约 196 KB（0.196 MB），gzip 后约 59 KB（0.059 MB）。
 
-[在线体验](https://jar-analyzer.github.io/jsd/) · [GitHub 开源地址](https://github.com/jar-analyzer/jsd)
+[在线体验](https://jar-analyzer.github.io/jsd/)
 
 本项目将作为下一代 **jar-analyzer** 的底层反编译引擎。
 
 支持常见控制流、lambda、嵌套类、record，以及截至 Java 25 的部分语法。
 
 ## 使用
+
+已发布到 npm：[`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd)，当前版本为 **1.0.3**。
 
 ### 1. 浏览器
 
