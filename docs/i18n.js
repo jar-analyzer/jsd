@@ -20,6 +20,12 @@ const dict = {
     welcomeTitle: 'From bytecode to readable Java',
     welcomeHint:
       'Open a class or archive, then explore its source. No installation or upload required.',
+    bundleSize:
+      'Just one ~196 KB JS file (~59 KB gzipped). No runtime dependencies or WebAssembly.',
+    githubSource: 'Open source on GitHub:',
+    usageTitle: 'Use jsd in your own page',
+    usageHint:
+      'Save this as an HTML file, serve it over HTTP, then choose a .class file to decompile.',
     stepOpen: '01 · Open files',
     stepSelect: '02 · Select a class',
     stepExport: '03 · Copy or download',
@@ -84,6 +90,10 @@ const dict = {
     localNote: '文件仅在当前浏览器内处理。',
     welcomeTitle: '从字节码到可读的 Java',
     welcomeHint: '打开 class 或压缩包，浏览反编译源码。无需安装，无需上传。',
+    bundleSize: '仅需一个约 196 KB 的 JS 文件（gzip 后约 59 KB）。零运行时依赖，无需 WebAssembly。',
+    githubSource: 'GitHub 开源地址：',
+    usageTitle: '在你的网页中使用 jsd',
+    usageHint: '将以下示例保存为 HTML 文件，通过 HTTP 打开，选择 .class 文件即可反编译。',
     stepOpen: '01 · 打开文件',
     stepSelect: '02 · 选择类',
     stepExport: '03 · 复制或下载',

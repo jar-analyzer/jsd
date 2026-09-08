@@ -165,11 +165,36 @@
           <p data-i18n="welcomeHint">
             Open a class or archive, then explore its source. No installation or upload required.
           </p>
+          <p class="bundle-size" data-i18n="bundleSize">
+            Just one ~196 KB JS file (~59 KB gzipped). No runtime dependencies or WebAssembly.
+          </p>
+          <p class="project-link">
+            <span data-i18n="githubSource">Open source on GitHub:</span>
+            <a href="https://github.com/jar-analyzer/jsd">github.com/jar-analyzer/jsd</a>
+          </p>
           <div class="welcome-steps">
             <span data-i18n="stepOpen">01 · Open files</span
             ><span data-i18n="stepSelect">02 · Select a class</span
             ><span data-i18n="stepExport">03 · Copy or download</span>
           </div>
+          <details class="usage-example">
+            <summary data-i18n="usageTitle">Use jsd in your own page</summary>
+            <p data-i18n="usageHint">
+              Save this as an HTML file, serve it over HTTP, then choose a .class file to decompile.
+            </p>
+            <pre><code>&lt;input type="file" accept=".class" /&gt;
+&lt;pre id="source"&gt;&lt;/pre&gt;
+&lt;script type="module"&gt;
+  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.0.3/dist/jsd.min.js';
+
+  document.querySelector('input').onchange = async (event) =&gt; {
+    const file = event.target.files[0];
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    document.getElementById('source').textContent = decompileClassFile(bytes).source;
+  };
+&lt;/script&gt;</code></pre>
+          </details>
         </div>
         <div id="noSource" hidden data-i18n="noSource">
           No Java source was produced. Review the diagnostics above.

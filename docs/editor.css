@@ -59,7 +59,10 @@
 }
 #welcome {
   margin: auto;
-  max-width: 660px;
+  width: 100%;
+  max-width: 740px;
+  min-height: 0;
+  overflow: auto;
   padding: 40px;
 }
 .welcome-mark {
@@ -83,6 +86,45 @@
   color: #969696;
   line-height: 1.8;
   max-width: 470px;
+}
+#welcome .bundle-size {
+  margin-top: 16px;
+  color: #75beff;
+  font-weight: 600;
+}
+#welcome .project-link {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.project-link a {
+  color: #75beff;
+}
+.usage-example {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.usage-example summary {
+  cursor: pointer;
+  color: #ddd;
+}
+.usage-example summary:focus-visible {
+  outline: 1px solid #007fd4;
+}
+.usage-example p {
+  margin-top: 12px;
+}
+.usage-example pre {
+  margin-top: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font:
+    12px/1.7 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
 }
 .welcome-steps {
   display: flex;
