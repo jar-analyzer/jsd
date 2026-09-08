@@ -39,5 +39,5 @@ export function forInitStr(s: Stmt, rc: RenderCtx, noDeclare = false): string {
     }
     return `${existing} = ${exprStr(e.expr, rc, PREC.lambda)}`;
   }
-  return exprStr(e, rc, PREC.lambda);
+  return exprStr(e, rc, PREC.lambda, false);
 }

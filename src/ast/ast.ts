@@ -25,6 +25,7 @@ export type Expr =
   | { kind: 'instanceof'; expr: Expr; checkType: JType; bindName?: string }
   | {
       kind: 'invoke';
+      eraseResult?: boolean;
       mode: 'virtual' | 'static' | 'special' | 'interface';
       owner: string;
       name: string;
@@ -36,7 +37,14 @@ export type Expr =
       bootstrap?: { name: string; index: number; interfaces?: string[] };
     }
   | { kind: 'new'; owner: string; descriptor?: string; args: Expr[]; outer?: Expr }
-  | { kind: 'new-array'; elemType: JType; dimsExprs: Expr[]; dims: number; jtype?: JType }
+  | {
+      kind: 'new-array';
+      initializerProbe?: boolean;
+      elemType: JType;
+      dimsExprs: Expr[];
+      dims: number;
+      jtype?: JType;
+    }
   | { kind: 'array-init'; elemType: JType; values: Expr[] }
   | { kind: 'array-length'; array: Expr }
   | { kind: 'array-load'; array: Expr; index: Expr; jtype?: JType }

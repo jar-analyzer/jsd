@@ -8,6 +8,26 @@ import { RenderCtx, renderStmts, renderStmtsHeader, typeStr } from '../printer/i
 import { buildMethodSig, ctorHasOuterParam, safeSig } from './methodsig.js';
 import type { ClassGenerator } from './index.js';
 
+function renderInitializer(stmts: Stmt[], rc: RenderCtx, isStatic: boolean): string[] {
+  const body = structuredClone(stmts);
+  const labels = new Set<string>();
+  let hasReturn = false;
+  for (const stmt of body)
+    walkStmt(stmt, (node) => {
+      if ('label' in node && node.label) labels.add(node.label);
+      if (node.kind === 'return') hasReturn = true;
+    });
+  const opening = isStatic ? '    static {' : '    {';
+  if (!hasReturn) return ['', opening, ...renderStmts(body, rc, 2), '    }'];
+  let label = 'initialize';
+  while (labels.has(label)) label += '$';
+  for (const stmt of body)
+    walkStmt(stmt, (node) => {
+      if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
+    });
+  return ['', opening, `        ${label}: {`, ...renderStmts(body, rc, 3), '        }', '    }'];
+}
+
 export const anonPart: ThisType<ClassGenerator> &
   Pick<ClassGenerator, 'buildAnonInfo' | 'methodRenderCtxFor' | 'methodHeaderFor'> = {
   buildAnonInfo(): void {
@@ -124,29 +144,7 @@ export const anonPart: ThisType<ClassGenerator> &
         if (bodyInitializers.length && ctor) {
           const rc = this.methodRenderCtxFor(cf, ctor);
           rc.fieldValues = captureValues;
-          const labels = new Set<string>();
-          let hasReturn = false;
-          for (const stmt of bodyInitializers)
-            walkStmt(stmt, (node) => {
-              if ('label' in node && node.label) labels.add(node.label);
-              if (node.kind === 'return') hasReturn = true;
-            });
-          let label = 'initialize';
-          while (labels.has(label)) label += '$';
-          if (hasReturn) {
-            for (const stmt of bodyInitializers)
-              walkStmt(stmt, (node) => {
-                if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
-              });
-            lines.push(
-              '',
-              '    {',
-              `        ${label}: {`,
-              ...renderStmts(bodyInitializers, rc, 3),
-              '        }',
-              '    }',
-            );
-          } else lines.push('', '    {', ...renderStmts(bodyInitializers, rc, 2), '    }');
+          lines.push(...renderInitializer(bodyInitializers, rc, false));
         }
         for (const mm of cf.methods) {
           if (mm.name === '<clinit>') {
@@ -154,12 +152,7 @@ export const anonPart: ThisType<ClassGenerator> &
             if (body?.failed) throw new Error(body.failed);
             const stmts = body?.stmts.filter((s) => s.kind !== 'return') ?? [];
             if (stmts.length)
-              lines.push(
-                '',
-                '    static {',
-                ...renderStmts(stmts, this.methodRenderCtxFor(cf, mm), 2),
-                '    }',
-              );
+              lines.push(...renderInitializer(stmts, this.methodRenderCtxFor(cf, mm), true));
             continue;
           }
           if (mm.name === '<init>' || mm.synthetic || (mm.access & 0x0040) !== 0) continue;

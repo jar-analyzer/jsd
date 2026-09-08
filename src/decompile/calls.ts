@@ -1,6 +1,6 @@
 import type { Expr } from '../ast/ast.js';
 import { expressionType } from '../ast/types.js';
-import { parseClassSignature, parseMethodDescriptor, type JType } from '../classfile/types.js';
+import { parseMethodDescriptor, type JType } from '../classfile/types.js';
 import type { Ctx } from './context.js';
 
 export function adaptCallArgument(
@@ -28,37 +28,12 @@ export function adaptCallArgument(
     return { kind: 'cast', jtype: at, expr: { ...a, erasedLambda: true } };
   }
   if (
-    hasReferenceOverload(
-      ctx,
-      owner,
-      name,
-      descriptor,
-      i,
-      allowUnknownOverloads &&
-        (rawReceiver ||
-          nonGenericReturn(signature.ret, ctx) ||
-          (pt.kind !== 'array' &&
-            (at?.kind === 'array' || (a.kind === 'const' && a.ctype === 'null')))),
-    ) &&
+    hasReferenceOverload(ctx, owner, name, descriptor, i, allowUnknownOverloads) &&
     (!at || erasedType(at) !== erasedType(pt))
   ) {
     return { kind: 'cast', jtype: pt, expr: a };
   }
   return a;
-}
-
-function nonGenericReturn(type: JType, ctx: Ctx): boolean {
-  if (type.kind === 'prim') return true;
-  if (type.kind !== 'class' || type.name === 'java/lang/Object') return false;
-  if (['java/lang/String', 'java/lang/StringBuilder', 'java/lang/StringBuffer'].includes(type.name))
-    return true;
-  const cls = ctx.lookup(type.name);
-  if (!cls) return false;
-  try {
-    return !cls.signature || parseClassSignature(cls.signature).typeParams.length === 0;
-  } catch {
-    return false;
-  }
 }
 
 function erasedType(t: JType): string {

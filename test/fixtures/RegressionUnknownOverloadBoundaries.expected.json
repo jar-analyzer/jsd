@@ -1,0 +1,4 @@
+{
+  "stdout": "object\nobject\ngeneric\n1\n",
+  "dependencies": ["MissingOverloads.class", "MissingGeneric.class"]
+}

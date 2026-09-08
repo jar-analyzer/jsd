@@ -1,6 +1,6 @@
 import type { Expr } from '../../ast/ast.js';
 import { expressionType } from '../../ast/types.js';
-import type { JType } from '../../classfile/types.js';
+import { parseMethodDescriptor, type JType } from '../../classfile/types.js';
 import type { Ctx } from '../context.js';
 import { adaptCallArgument, adaptPrimitiveValue } from '../calls.js';
 
@@ -12,20 +12,11 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
       !receiver.args?.length &&
       !ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
     const args = e.args.map((arg, i) =>
-      adaptCallArgument(
-        arg,
-        e.descriptor,
-        i,
-        ctx,
-        e.owner,
-        e.name,
-        raw,
-        e.mode === 'static' || raw,
-      ),
+      adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw, true),
     );
     const target =
       e.target &&
-      raw &&
+      !e.superCall &&
       !ctx.lookup(e.owner) &&
       args.some((arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim')
         ? {
@@ -34,7 +25,12 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
             expr: e.target,
           }
         : e.target;
-    return { ...e, target, args };
+    const ret = parseMethodDescriptor(e.descriptor).ret;
+    const eraseResult =
+      !ctx.lookup(e.owner) &&
+      ret.kind !== 'prim' &&
+      args.some((arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim');
+    return { ...e, target, args, eraseResult };
   }
   if (e.kind === 'new')
     return {

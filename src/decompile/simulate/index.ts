@@ -87,16 +87,9 @@ export class Simulator {
   snapshotDuplicates(ins: Instr, stack: ExprStack, stmts: Stmt[]): void {
     const count = ins.op >= 0x5c && !stack.peek().w ? 2 : 1;
     const needsSnapshot = (e: Expr): boolean =>
-      ![
-        'const',
-        'local',
-        'this',
-        'super',
-        'new-uninit',
-        'new-array',
-        'sb-chain',
-        'class-literal',
-      ].includes(e.kind);
+      !['const', 'local', 'this', 'super', 'new-uninit', 'sb-chain', 'class-literal'].includes(
+        e.kind,
+      ) && !(e.kind === 'new-array' && e.initializerProbe === true);
     if (!stack.items.slice(-count).some((item) => needsSnapshot(item.e))) return;
 
     const replacements = new Map<Expr, Expr>();

@@ -41,7 +41,7 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
           line(`${declaration}${plan.name} ${operator} ${exprStr(plan.value, rc, PREC.lambda)};`),
         ];
       }
-      return [line(`${exprStr(e, rc, PREC.lambda)};`)];
+      return [line(`${exprStr(e, rc, PREC.lambda, false)};`)];
     }
     case 'if': {
       const cond = exprStr(s.cond, rc, PREC.lambda);
@@ -82,7 +82,7 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
         const init = s.init.map((st2) => forInitStr(st2, rc, true)).join(', ');
         const cond = s.cond ? exprStr(s.cond, rc, PREC.lambda) : '';
         const update = s.update
-          .map((st2) => (st2.kind === 'expr' ? exprStr(st2.expr, rc, PREC.lambda) : ''))
+          .map((st2) => (st2.kind === 'expr' ? exprStr(st2.expr, rc, PREC.lambda, false) : ''))
           .join(', ');
         const bodyLines = renderBlockOuter(s.body, rc, indent + 1);
         return [
@@ -95,7 +95,7 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
       const init = s.init.map((st2) => forInitStr(st2, rc)).join(', ');
       const cond = s.cond ? exprStr(s.cond, rc, PREC.lambda) : '';
       const update = s.update
-        .map((st2) => (st2.kind === 'expr' ? exprStr(st2.expr, rc, PREC.lambda) : ''))
+        .map((st2) => (st2.kind === 'expr' ? exprStr(st2.expr, rc, PREC.lambda, false) : ''))
         .join(', ');
       const bodyLines = renderBlockOuter(s.body, rc, indent + 1);
       return [line(`${label}for (${init}; ${cond}; ${update}) {`), ...bodyLines, line('}')];

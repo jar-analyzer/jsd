@@ -6,6 +6,7 @@
 - Improve lambda and method reference recovery.
 - Preserve field access and overload semantics.
 - Preserve expression evaluation order.
+- Preserve array initialization semantics.
 - Preserve anonymous class initialization and locking behavior.
 - Improve generic and sealed type recovery.
 - Avoid misidentifying compiler-generated code.

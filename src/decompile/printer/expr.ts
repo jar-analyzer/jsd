@@ -3,7 +3,7 @@ import { expressionType } from '../../ast/types.js';
 import { initialType } from '../java/types.js';
 import { javaLiteral } from './literals.js';
 import { AssignTarget, Expr, walkExpr } from '../../ast/ast.js';
-import type { JType } from '../../classfile/types.js';
+import { parseMethodDescriptor, type JType } from '../../classfile/types.js';
 import {
   PREC,
   RenderCtx,
@@ -18,8 +18,13 @@ import { typeStr, nestedDisplay, simpleOf } from './types.js';
 
 export { escapeString } from './literals.js';
 
-export function exprStr(e: Expr, rc: RenderCtx, prec = 0): string {
-  const [s, p] = exprPrec(prepareExpression(e, rc.ctx), rc);
+export function exprStr(e: Expr, rc: RenderCtx, prec = 0, valueRequired = true): string {
+  const prepared = prepareExpression(e, rc.ctx);
+  let [s, p] = exprPrec(prepared, rc);
+  if (valueRequired && prepared.kind === 'invoke' && prepared.eraseResult) {
+    s = `(${typeStr(parseMethodDescriptor(prepared.descriptor).ret, rc)}) (${s})`;
+    p = PREC.cast;
+  }
   return p < prec ? `(${s})` : s;
 }
 

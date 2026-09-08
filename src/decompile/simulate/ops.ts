@@ -9,7 +9,7 @@ import { discardOperands } from './discard.js';
 import { canConcatenateBuilder, concatAppendArgument } from './string-builder.js';
 import { expressionType } from '../../ast/types.js';
 import { BinOp, Expr, Stmt } from '../../ast/ast.js';
-import { Instr } from '../../bytecode/decode.js';
+import { decodeBytecode, Instr } from '../../bytecode/decode.js';
 import type { Block } from '../../bytecode/cfg.js';
 import { ATYPE_NAMES } from '../../classfile/opcodes.js';
 import { JType, parseFieldDescriptor, parseMethodDescriptor } from '../../classfile/types.js';
@@ -381,7 +381,33 @@ export const opsPart: ThisType<Simulator> &
                   if (parameter.name) names.add(parameter.name);
               }
             }
+            const capturedSlots = new Set<number>();
+            const constructor = anonymous.methods.find(
+              (method) => method.name === '<init>' && method.descriptor === ref.descriptor,
+            );
+            const instructions = constructor?.code ? decodeBytecode(constructor.code.code) : [];
+            for (let i = 1; i < instructions.length; i++) {
+              const instruction = instructions[i];
+              if (instruction.op !== 0xb5) continue;
+              const field = anonymous.cp.memberRef(instruction.cpIndex!);
+              const info = anonymous.fields.find((item) => item.name === field.name);
+              const load = instructions[i - 1];
+              if (
+                field.owner === anonymous.name &&
+                info &&
+                (info.synthetic || info.access & 0x1000) &&
+                !field.name.startsWith('this$') &&
+                isLoadOp(load.op)
+              )
+                capturedSlots.add(load.local ?? opcodeSlot(load.name));
+            }
+            let parameterSlot = 1;
             for (let i = 0; i < args.length; i++) {
+              const captured = capturedSlots.has(parameterSlot);
+              const parameter = md.params[i];
+              parameterSlot +=
+                parameter.kind === 'prim' && ['long', 'double'].includes(parameter.name) ? 2 : 1;
+              if (!captured) continue;
               const value = this.preserveDiscarded(args[i], ins.pc, stack.depth + i, stmts, true);
               if (value.kind === 'local' && value !== args[i]) {
                 let name = `$jsd$capture${value.slot}`;
@@ -724,7 +750,13 @@ export const opsPart: ThisType<Simulator> &
     if (n < 0 || n > 4096) return null;
     const startIdx = b.instrs.indexOf(ins) + 1;
     if (startIdx >= b.instrs.length) return null;
-    const arrExpr: Expr = { kind: 'new-array', elemType: elem, dimsExprs: [len], dims: 1 };
+    const arrExpr: Expr = {
+      kind: 'new-array',
+      initializerProbe: true,
+      elemType: elem,
+      dimsExprs: [len],
+      dims: 1,
+    };
     const scratch = new ExprStack();
     scratch.push(arrExpr);
     const scratchStmts: Stmt[] = [];
@@ -761,7 +793,7 @@ export const opsPart: ThisType<Simulator> &
           return null;
         }
         if (stored === n) {
-          if (scratch.depth !== 1) {
+          if (scratch.depth !== 1 || scratchStmts.length !== 0) {
             return null;
           }
           b.instrs.splice(startIdx, i - startIdx + 1);
@@ -780,7 +812,14 @@ export const opsPart: ThisType<Simulator> &
       ) {
         return null;
       }
-      if (scratchStmts.length > 0) return null;
+      if (
+        scratchStmts.length > 0 ||
+        cur.op === 0x84 ||
+        cur.op === 0xb3 ||
+        cur.op === 0xb5 ||
+        (cur.op >= 0x36 && cur.op <= 0x4e)
+      )
+        return null;
       try {
         this.execInstr(cur, scratch, scratchStmts, b);
       } catch {
