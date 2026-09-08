@@ -1,0 +1,37 @@
+name: production-build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack release
+        run: |
+          mkdir release
+          npm pack --pack-destination release
+      - name: Generate checksum
+        working-directory: release
+        run: sha256sum *.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jsd-production-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/
+            release/
+          if-no-files-found: error
+          retention-days: 30
