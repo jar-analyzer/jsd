@@ -1,14 +1,15 @@
+import { transformChildren } from '../patterns/hoist.js';
 import * as graph from './graph.js';
 import type { StructureOperations } from './operations.js';
 import { Stmt } from '../../ast/ast.js';
-import { backEdges, naturalLoop } from '../../bytecode/cfg.js';
+import { backEdges, naturalLoop, exceptionalLoopCFG } from '../../bytecode/cfg.js';
 import type { CFG } from '../../bytecode/cfg.js';
 import type { ClassFile, MethodInfo } from '../../classfile/model.js';
 import { Ctx } from '../context.js';
 import type { SimResult, Terminator } from '../simulate/index.js';
 import { StructFail, RangeGroup, LoopInfo, WalkCtx, StructureOutput } from './types.js';
 import type { Breakable } from './types.js';
-import { stripMonitorExits } from './stmtstrip.js';
+import { stripMonitorExits, stripTrailingDeep } from './stmtstrip.js';
 import { ifPart } from './if.js';
 import { switchPart } from './switch.js';
 import { loopPart } from './loop.js';
@@ -40,9 +41,11 @@ export class Structurer {
     readonly cfg: CFG,
     readonly sim: SimResult,
   ) {
-    for (const be of backEdges(cfg)) {
+    const loopCFG = exceptionalLoopCFG(cfg, method.code?.exceptions ?? [], ctx.budget);
+    for (const be of backEdges(loopCFG)) {
+      if (!cfg.blocks[be.src].succs.includes(be.dst)) continue;
       const info = this.loops.get(be.dst);
-      const blocks = naturalLoop(cfg, be.src, be.dst);
+      const blocks = naturalLoop(loopCFG, be.src, be.dst);
       if (info) {
         info.blocks = new Set([...info.blocks, ...blocks]);
         info.backSrcs.push(be.src);
@@ -88,7 +91,18 @@ export class Structurer {
       if (this.syncLockSlots.size) {
         for (const slot of this.syncLockSlots) stmts = stripMonitorExits(stmts, slot);
       }
-      return { stmts };
+      const clean = (list: Stmt[]): Stmt[] => {
+        for (const stmt of list) {
+          if (stmt.kind === 'try' && stmt.finallyS) {
+            stmt.body = stripTrailingDeep(stmt.body, stmt.finallyS);
+            for (const handler of stmt.catches)
+              handler.body = stripTrailingDeep(handler.body, stmt.finallyS);
+          }
+          transformChildren(stmt, clean);
+        }
+        return list;
+      };
+      return { stmts: clean(stmts) };
     } catch (e) {
       if (e instanceof StructFail) return { stmts: [], failed: e.message };
       throw e;

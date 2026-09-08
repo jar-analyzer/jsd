@@ -25,6 +25,7 @@ export function exprStr(e: Expr, rc: RenderCtx, prec = 0, valueRequired = true):
     s = `(${typeStr(parseMethodDescriptor(prepared.descriptor).ret, rc)}) (${s})`;
     p = PREC.cast;
   }
+  rc.ctx?.budget.previewOutput(s.length + (p < prec ? 2 : 0));
   return p < prec ? `(${s})` : s;
 }
 
@@ -212,8 +213,8 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         const ts = fieldReceiver(e.target, e.owner, e.name, rc);
         return [`${ts}.${fieldName}`, PREC.postfix];
       }
-      if (e.owner === rc.className) return [fieldName, PREC.postfix];
-      return [`${resolve(e.owner, rc)}.${fieldName}`, PREC.postfix];
+
+      return [staticFieldName(e.owner, fieldName, rc), PREC.postfix];
     }
     case 'ternary': {
       const c = exprStr(e.cond, rc, PREC.ternary + 1);
@@ -326,8 +327,8 @@ function assignTargetStr(t: AssignTarget, rc: RenderCtx): string {
         if (t.target.kind === 'this' && t.owner === rc.className) return `this.${fieldName}`;
         return `${fieldReceiver(t.target, t.owner, t.name, rc)}.${fieldName}`;
       }
-      if (t.owner === rc.className) return fieldName;
-      return `${resolve(t.owner, rc)}.${fieldName}`;
+
+      return staticFieldName(t.owner, fieldName, rc);
     }
     case 'array':
       return `${exprStr(t.array, rc, PREC.postfix)}[${exprStr(t.index, rc, PREC.lambda)}]`;
@@ -353,4 +354,12 @@ function fieldReceiver(target: Expr, owner: string, name: string, rc: RenderCtx)
     }
   }
   return exprStr(target, rc, PREC.postfix);
+}
+
+function staticFieldName(owner: string, name: string, rc: RenderCtx): string {
+  const shadowed = [
+    ...rc.slotNames.values(),
+    ...rc.scopes.flatMap((scope) => [...scope.values()]),
+  ].includes(name);
+  return owner === rc.className && !shadowed ? name : `${resolve(owner, rc)}.${name}`;
 }

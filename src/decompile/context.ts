@@ -8,6 +8,8 @@ import type { LocalVarEntry } from '../classfile/model.js';
 
 export interface DecompileOptions {
   maxInputBytes?: number;
+  maxTotalInputBytes?: number;
+  maxClasses?: number;
   maxWork?: number;
   maxOutputChars?: number;
   timeoutMs?: number;

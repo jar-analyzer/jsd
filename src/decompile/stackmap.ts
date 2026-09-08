@@ -8,6 +8,15 @@ const width = (type: VerificationType) => (type.tag === 3 || type.tag === 4 ? 2 
 export function validateStackMaps(method: MethodInfo, instructions: Instr[]): void {
   const code = method.code!;
   const boundaries = new Map(instructions.map((i) => [i.pc, i]));
+  for (const entry of code.exceptions) {
+    if (
+      !boundaries.has(entry.startPc) ||
+      entry.endPc <= entry.startPc ||
+      (entry.endPc !== code.code.length && !boundaries.has(entry.endPc)) ||
+      !boundaries.has(entry.handlerPc)
+    )
+      throw new Error('Invalid exception table boundary');
+  }
   let locals: number[] = method.access & 8 ? [] : [1];
   locals.push(
     ...parseMethodDescriptor(method.descriptor).params.map((t) =>

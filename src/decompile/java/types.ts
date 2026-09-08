@@ -64,7 +64,13 @@ export function declarationType(
     }
     return inferred;
   }
-  return lv ?? inferred;
+  return (
+    lv ??
+    inferred ??
+    (init.kind === 'const' && init.ctype === 'null'
+      ? { kind: 'class', name: 'java/lang/Object' }
+      : undefined)
+  );
 }
 
 export function compatibleTypes(a: JType, b: JType): boolean {

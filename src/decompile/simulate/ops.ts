@@ -140,7 +140,8 @@ export const opsPart: ThisType<Simulator> &
     ) {
       const slot = ins.local ?? opcodeSlot(nm);
       const v = stack.pop();
-      stmts.push(this.assignLocal(slot, v, ins.pc));
+      const saved = this.snapshotWrite(stack, stmts, ins.pc, slot);
+      stmts.push(this.assignLocal(slot, saved.get(v) ?? v, ins.pc));
       return;
     }
     if (
@@ -158,6 +159,7 @@ export const opsPart: ThisType<Simulator> &
       const val = stack.pop(),
         idx = stack.pop(),
         arr = stack.pop();
+      this.snapshotWrite(stack, stmts, ins.pc);
       stmts.push({
         kind: 'expr',
         expr: { kind: 'assign-expr', target: { kind: 'array', array: arr, index: idx }, expr: val },
@@ -325,6 +327,8 @@ export const opsPart: ThisType<Simulator> &
     if (nm === 'putstatic' || nm === 'putfield') {
       const ref = cp.memberRef(ins.cpIndex!);
       const val = stack.pop();
+      const target = nm === 'putfield' ? stack.pop() : undefined;
+      this.snapshotWrite(stack, stmts, ins.pc);
       if (nm === 'putstatic') {
         stmts.push({
           kind: 'expr',
@@ -335,7 +339,6 @@ export const opsPart: ThisType<Simulator> &
           },
         });
       } else {
-        const target = stack.pop();
         stmts.push({
           kind: 'expr',
           expr: {
@@ -355,6 +358,17 @@ export const opsPart: ThisType<Simulator> &
     ) {
       const ref = cp.memberRef(ins.cpIndex!);
       const md = parseMethodDescriptor(ref.descriptor);
+      if (
+        nm === 'invokeinterface' &&
+        ins.count !==
+          md.params.reduce(
+            (sum, type) =>
+              sum +
+              (type.kind === 'prim' && (type.name === 'long' || type.name === 'double') ? 2 : 1),
+            1,
+          )
+      )
+        throw new SimFail('invalid invokeinterface count');
       const args: Expr[] = [];
       for (let i = 0; i < md.params.length; i++) args.unshift(stack.pop());
       const returns = md.ret.kind !== 'prim' || md.ret.name !== 'void';
@@ -713,9 +727,11 @@ export const opsPart: ThisType<Simulator> &
     this.ctx.recordSlotType(
       this.method,
       slot,
-      (this.method.code?.localVars.length && v.kind !== 'class-literal'
-        ? (v as { jtype?: JType }).jtype
-        : expressionType(v)) ?? constType(v),
+      v.kind === 'const' && v.ctype === 'null'
+        ? undefined
+        : ((this.method.code?.localVars.length && v.kind !== 'class-literal'
+            ? (v as { jtype?: JType }).jtype
+            : expressionType(v)) ?? constType(v)),
     );
     const pcs = this.sim.slotAssignPc?.get(slot) ?? [];
     if (!pcs.includes(pc)) pcs.push(pc);

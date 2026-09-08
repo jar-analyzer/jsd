@@ -175,7 +175,7 @@ function parseBootstrapArg(rd: ByteReader, cp: ConstantPool): BootstrapArg {
   }
 }
 
-export function parseClass(data: Uint8Array): ClassFile {
+export function parseClass(data: Uint8Array, checkName?: (name: string) => void): ClassFile {
   const r = new ByteReader(data);
   const magic = r.u4();
   if (magic !== 0xcafebabe) throw new Error(`not a class file (magic 0x${magic.toString(16)})`);
@@ -184,6 +184,7 @@ export function parseClass(data: Uint8Array): ClassFile {
   const cp = new ConstantPool(r);
   const access = r.u2();
   const name = cp.className(r.u2());
+  checkName?.(name);
   const superIdx = r.u2();
   const superName = superIdx === 0 ? null : cp.className(superIdx);
   const ifCount = r.u2();

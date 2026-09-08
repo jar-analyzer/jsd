@@ -1,3 +1,4 @@
+import { OutputLines } from '../budget.js';
 import type { AnonInfo } from '../printer/context.js';
 import {
   diagnosticStatus,
@@ -44,7 +45,7 @@ export function generateClass(
 }
 
 export class ClassGenerator {
-  out: string[] = [];
+  out: string[];
   refs = new Set<string>();
   nameResolver: (internal: string) => string = (n) => nestedDisplay(n);
   anonClasses = new Map<string, AnonInfo>();
@@ -61,7 +62,9 @@ export class ClassGenerator {
     readonly standalone: boolean,
     readonly nestedBodies: string[] = [],
     readonly ownNested: Set<string> = new Set(),
-  ) {}
+  ) {
+    this.out = new OutputLines(ctx.budget);
+  }
 
   generate(): ClassSource {
     this.ctx.budget.check();
@@ -89,12 +92,12 @@ export class ClassGenerator {
     this.nameResolver = (n) => nestedDisplay(n);
     this.renderBody();
     const imports = this.computeImports();
-    this.out = [];
+    this.out = new OutputLines(this.ctx.budget);
 
     this.nameResolver = this.buildResolver();
     this.refs = new Set();
     this.buildAnonInfo();
-    const head: string[] = [];
+    const head = new OutputLines(this.ctx.budget);
     const pkg = this.cls.name.includes('/')
       ? this.cls.name.slice(0, this.cls.name.lastIndexOf('/')).replace(/\//g, '.')
       : '';
@@ -104,10 +107,20 @@ export class ClassGenerator {
       if (imports.length) head.push(...imports.map((i) => `import ${i};`), '');
     }
     this.renderBody();
+    this.ctx.budget.previewOutput(
+      [...head, ...this.out].reduce((sum, line) => sum + line.length + 1, 0),
+    );
     let body = [...head, ...this.out].join('\n');
     if (this.nestedBodies.length) {
       const i = body.lastIndexOf('}');
       const indent = this.standalone ? '' : '    ';
+      this.ctx.budget.previewOutput(
+        body.length +
+          this.nestedBodies.reduce(
+            (sum, text) => sum + text.length + (indent.length + 4) * text.split('\n').length + 1,
+            0,
+          ),
+      );
       const nestedText = this.nestedBodies
         .map((b) =>
           b

@@ -114,9 +114,10 @@ export const switchPart: ThisType<Structurer> &
       breakables: [...wctx.breakables, brk],
     };
 
+    const patMode = !!patCaseTypes;
     const ordered = [...term.cases]
       .filter((c) => c.value !== null)
-      .sort((x, y) => (x.value as number) - (y.value as number));
+      .sort((x, y) => this.cfg.blocks[x.target].startPc - this.cfg.blocks[y.target].startPc);
     const dflt = term.cases.find((c) => c.value === null);
 
     const groups: { value: number; target: number }[] = [];
@@ -126,9 +127,19 @@ export const switchPart: ThisType<Structurer> &
       groups.push(c as { value: number; target: number });
     }
 
+    if (dflt && !groups.some((g) => g.target === dflt.target))
+      groups.push({ value: NaN, target: dflt.target });
+    groups.sort((a, b) =>
+      patMode
+        ? Number.isNaN(a.value)
+          ? 1
+          : Number.isNaN(b.value)
+            ? -1
+            : a.value - b.value
+        : this.cfg.blocks[a.target].startPc - this.cfg.blocks[b.target].startPc,
+    );
     const caseTargets = groups.map((g) => g.target);
     const caseTypes = patCaseTypes;
-    const patMode = !!caseTypes;
     const cases: { labels: (number | string)[]; body: Stmt[]; hasDefault?: boolean }[] = [];
     for (let gi = 0; gi < groups.length; gi++) {
       const g = groups[gi];
@@ -158,7 +169,9 @@ export const switchPart: ThisType<Structurer> &
         wctx2,
       );
       let labels: (number | string)[];
-      if (patMode && caseTypes) {
+      if (Number.isNaN(g.value)) {
+        labels = [];
+      } else if (patMode && caseTypes) {
         labels = ordered
           .filter((entry) => entry.target === g.target)
           .map((entry) => {

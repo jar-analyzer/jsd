@@ -45,14 +45,36 @@ export class DynamicClassBuilder {
     const nat = this.entry(12, ...u2(this.utf8(name)), ...u2(this.utf8(descriptor)));
     return this.entry(tag, ...u2(bsm), ...u2(nat));
   }
-  build(code: number[], descriptor: string): Uint8Array {
+  build(
+    code: number[],
+    descriptor: string,
+    options: {
+      stackMap?: number[];
+      exceptions?: number[][];
+      maxStack?: number;
+      maxLocals?: number;
+    } = {},
+  ): Uint8Array {
     const self = this.classRef(this.name),
       parent = this.classRef('java/lang/Object');
     const method = this.utf8('value'),
       desc = this.utf8(descriptor),
       codeName = this.utf8('Code');
     const bootstrapName = this.utf8('BootstrapMethods');
-    const body = [...u2(16), ...u2(16), ...u4(code.length), ...code, ...u2(0), ...u2(0)];
+    const attributes = options.stackMap
+      ? [...u2(this.utf8('StackMapTable')), ...u4(options.stackMap.length), ...options.stackMap]
+      : [];
+    const exceptions = options.exceptions ?? [];
+    const body = [
+      ...u2(options.maxStack ?? 16),
+      ...u2(options.maxLocals ?? 16),
+      ...u4(code.length),
+      ...code,
+      ...u2(exceptions.length),
+      ...exceptions.flatMap((entry) => entry.flatMap(u2)),
+      ...u2(options.stackMap ? 1 : 0),
+      ...attributes,
+    ];
     const bootstraps = [
       ...u2(this.bootstraps.length),
       ...this.bootstraps.flatMap((b) => [

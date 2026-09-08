@@ -11,9 +11,9 @@
 
 A Java `.class` decompiler written in TypeScript. Runs in Node.js and browsers as a single ESM bundle, with no runtime dependencies or WebAssembly.
 
-**Small enough to drop straight into your page: just one ~220 KB JavaScript file (~66 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
+**Small enough to drop straight into your page: just one ~238 KB JavaScript file (~72 KB with gzip) to decompile Java `.class` files.** No runtime dependencies, WebAssembly or Java installation required.
 
-Size measured from the current minified `dist/jsd.min.js` bundle (~220 KB (0.220 MB) before gzip; ~66 KB (0.066 MB) after gzip).
+Size measured from the current minified `dist/jsd.min.js` bundle (~238 KB (0.238 MB) before gzip; ~72 KB (0.072 MB) after gzip).
 
 [Try the live demo](https://jar-analyzer.github.io/jsd/)
 
@@ -68,16 +68,22 @@ const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
 
 Oversized files raise an error. Batch processing records the error and continues with other files.
 
+For batches, use `maxTotalInputBytes` to limit the total loaded size and `maxClasses` to limit the number of loaded classes. `maxOutputChars` limits generated source; `maxWork` and `timeoutMs` limit processing. All limits are optional.
+
 ## Testing
 
-| CI suite         | Coverage                                                                                                                               | Environment           |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Unit             | Bytecode parsing, control flow, Java literals, diagnostics, Demo state and archive handling; formatting and browser bundle consistency | Node.js 24            |
-| Round-trip       | Compile and run original and recovered Java; compare output and fixture expectations                                                   | JDK 8, 11, 17, 21, 25 |
-| No debug info    | Round-trip cases compiled without debug information                                                                                    | JDK 8, 17, 25         |
-| Modern Java      | Selected Java 9–25 syntax, with and without debug information                                                                          | JDK 21, 25            |
-| Package consumer | Install the packed package; check TypeScript declarations, ESM imports, public APIs and license inclusion                              | Node.js 20, 24        |
-| Fuzz             | 2,000 bytecode mutations with a fixed seed; monitor crashes and timeouts                                                               | Node.js 24, JDK 25    |
+Counts reflect the current test suite. Modern Java and dynamic bytecode cases are selected by JDK version. Round-trip tests compile and run both the original and recovered Java, then compare their output.
+
+| Test suite       | Cases / rounds | Coverage                                                                                                           | CI environment        |
+| ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| Unit             | 216            | Parsing, type inference, resource limits, diagnostics and Demo behavior; formatting and browser bundle consistency | Node.js 24            |
+| Round-trip       | 138            | Evaluation order, switch fallthrough, exception cleanup and resource management                                    | JDK 8, 11, 17, 21, 25 |
+| No debug info    | 138            | The same round-trip suite compiled without debug information                                                       | JDK 8, 17, 25         |
+| Modern Java      | Up to 14       | Java 9–25 syntax, including records, sealed types and pattern matching; with and without debug information         | JDK 21, 25            |
+| Dynamic bytecode | Up to 37       | Runtime behavior of dynamic constants, string concatenation and dynamic switches                                   | JDK 11, 17, 21, 25    |
+| JVM validation   | 17             | Malformed StackMap frames, exception tables and instruction operands; compare rejection with the JVM               | JDK 11, 17, 21, 25    |
+| Package consumer | —              | Packed-package installation, TypeScript declarations, ESM imports, public APIs and license inclusion               | Node.js 20, 24        |
+| Fuzz             | 2,000 rounds   | Fixed-seed bytecode mutations; monitor crashes and timeouts                                                        | Node.js 24, JDK 25    |
 
 ## License
 

@@ -1,3 +1,4 @@
+import { OutputLines } from '../budget.js';
 import { prepareLocalAssignment } from '../java/locals.js';
 import { prepareReturnValue } from '../java/expressions.js';
 import { forInitDeclOutside, forInitStr } from './loops.js';
@@ -20,9 +21,9 @@ export function renderStmtsHeader(header: string, stmts: Stmt[], rc: RenderCtx):
 }
 
 export function renderStmts(stmts: Stmt[], rc: RenderCtx, indent: number): string[] {
-  const out: string[] = [];
+  const out = new OutputLines(rc.ctx.budget);
   for (const s of stmts) out.push(...renderStmt(s, rc, indent));
-  return out;
+  return Array.from(out);
 }
 
 export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {

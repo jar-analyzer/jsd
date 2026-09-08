@@ -10,9 +10,11 @@
 - Preserve anonymous class initialization and locking behavior.
 - Improve generic and sealed type recovery.
 - Avoid misidentifying compiler-generated code.
-- Correct conditional branch recovery.
+- Improve control-flow recovery.
+- Preserve exception cleanup semantics.
+- Preserve record constructor bodies.
 - Strengthen class-file and bytecode validation.
-- Add configurable resource limits.
+- Enforce configurable resource limits.
 - Refine the demo.
 - Expand regression coverage.
 

@@ -4,7 +4,6 @@ import type { RangeGroup, WalkCtx, RecoveredStatement } from './types.js';
 import { inferInitTypeSimple, stripResourceCloses } from './stmtstrip.js';
 import type { Structurer } from './index.js';
 
-import { isResourceHandler } from './resource-handler.js';
 export function detectTwr9(
   state: Structurer,
   group: RangeGroup,
@@ -116,18 +115,6 @@ export function detectTwr9(
     (a, b) => state.cfg.blocks[a].startPc - state.cfg.blocks[b].startPc,
   )[0];
   if (firstBody === undefined) return null;
-  for (const g2 of state.rangeGroups) {
-    if (g2 === group || g2.done) continue;
-    if (
-      g2.start >= bodyStart &&
-      g2.start < h1.handlerPc &&
-      g2.handlers.length > 0 &&
-      g2.handlers.every((x) => x.handlerPc !== h1.handlerPc) &&
-      !g2.handlers.some((x) => isResourceHandler(state, x.handlerPc))
-    ) {
-      g2.done = true;
-    }
-  }
 
   const spliceAssign = (slot: number): Stmt | undefined => {
     const lists: Stmt[][] = [outerStmts, state.sim.stmts[firstBody]];
@@ -181,7 +168,7 @@ export function detectTwr9(
   }
 
   let body = state.walk(firstBody, bodyNodes, new Set([...bodyExits]), wctx);
-  body = stripResourceCloses(body, resSlot);
+  body = stripResourceCloses(body, resSlot, bodyGroups);
 
   const exits = [...bodyExits]
     .filter((b) => !state.claimed[b])

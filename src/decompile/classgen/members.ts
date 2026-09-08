@@ -309,13 +309,13 @@ export const membersPart: ThisType<ClassGenerator> &
         return true;
       });
     }
-    if (this.isEnum && m.name === '<init>') {
+    if ((this.isEnum || this.isRecord) && m.name === '<init>') {
       while (
         stmts.length &&
         stmts[0].kind === 'expr' &&
         stmts[0].expr.kind === 'invoke' &&
         (stmts[0].expr as { superCall?: boolean }).superCall &&
-        (stmts[0].expr as { owner?: string }).owner === 'java/lang/Enum'
+        ['java/lang/Enum', 'java/lang/Record'].includes((stmts[0].expr as { owner: string }).owner)
       ) {
         stmts.shift();
       }

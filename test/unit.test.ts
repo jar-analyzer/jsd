@@ -1,3 +1,4 @@
+import './plan-validation.test.js';
 import './audit-regressions.test.js';
 import './engine-hardening.test.js';
 import './dynamic-bytecode.test.js';

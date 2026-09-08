@@ -1,3 +1,4 @@
+import { DecompileLimitError } from '../budget.js';
 import { errorMessage } from '../diagnostics.js';
 import { Acc, ClassFile, MethodInfo } from '../../classfile/model.js';
 import { JType, parseFieldDescriptor, parseMethodDescriptor } from '../../classfile/types.js';
@@ -171,6 +172,7 @@ export const anonPart: ThisType<ClassGenerator> &
             lines.push('');
             if (header) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
           } catch (e) {
+            if (e instanceof DecompileLimitError) throw e;
             this.ctx.diagnostics.add({
               code: 'ANONYMOUS_METHOD_RENDER_FAILED',
               severity: 'error',

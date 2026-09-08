@@ -25,6 +25,7 @@ export type Expr =
   | { kind: 'instanceof'; expr: Expr; checkType: JType; bindName?: string }
   | {
       kind: 'invoke';
+      bytecodeOffset?: number;
       eraseResult?: boolean;
       mode: 'virtual' | 'static' | 'special' | 'interface';
       owner: string;

@@ -1,3 +1,5 @@
+import type { ExceptionEntry } from '../classfile/model.js';
+import type { WorkBudget } from '../decompile/budget.js';
 import { Instr, branchSuccessors, isConditionalBranch, isSwitch } from './decode.js';
 
 export interface Block {
@@ -24,7 +26,9 @@ export function buildCFG(
   instrs: Instr[],
   handlerPcs: Set<number>,
   exceptionEntries: Set<number> = handlerPcs,
+  budget?: WorkBudget,
 ): CFG {
+  budget?.check(instrs.length);
   if (instrs.length === 0) throw new Error('empty method');
   const instructionStarts = new Set(instrs.map((ins) => ins.pc));
   for (const ins of instrs)
@@ -50,25 +54,28 @@ export function buildCFG(
   }
   for (const h of handlerPcs) leaders.add(h);
 
-  const starts = [...leaders].filter((pc) => instrs.some((i) => i.pc === pc)).sort((a, b) => a - b);
-  const instrByPc = new Map<number, Instr>();
-  for (const i of instrs) instrByPc.set(i.pc, i);
+  const starts = [...leaders].filter((pc) => instructionStarts.has(pc)).sort((a, b) => a - b);
   const blocks: Block[] = [];
   const byStart = new Map<number, number>();
   const blockIndexAt = new Int32Array(
     instrs[instrs.length - 1].pc + instrs[instrs.length - 1].size,
   ).fill(-1);
+  let instructionIndex = 0;
   for (let i = 0; i < starts.length; i++) {
+    budget?.check(1);
     const start = starts[i];
     const end =
       i + 1 < starts.length
         ? starts[i + 1]
         : instrs[instrs.length - 1].pc + instrs[instrs.length - 1].size;
+    const first = instructionIndex;
+    while (instructionIndex < instrs.length && instrs[instructionIndex].pc < end)
+      instructionIndex++;
     const bl: Block = {
       id: blocks.length,
       startPc: start,
       endPc: end,
-      instrs: instrs.filter((x) => x.pc >= start && x.pc < end),
+      instrs: instrs.slice(first, instructionIndex),
       succs: [],
       preds: [],
       fallthrough: -1,
@@ -121,15 +128,15 @@ export function buildCFG(
     preds: [],
     fallthrough: -1,
   });
-  const analysisRpo = computeRPO(analysisBlocks, root);
-  const rpo = computeRPO(blocks, entry);
-  const normalIdom = computeIdom(blocks, entry, rpo);
-  const handlerIdom = computeIdom(analysisBlocks, root, analysisRpo);
+  const analysisRpo = computeRPO(analysisBlocks, root, budget);
+  const rpo = computeRPO(blocks, entry, budget);
+  const normalIdom = computeIdom(blocks, entry, rpo, budget);
+  const handlerIdom = computeIdom(analysisBlocks, root, analysisRpo, budget);
 
   const idom = normalIdom.map((parent, b) =>
     parent >= 0 ? parent : handlerIdom[b] === root ? -1 : handlerIdom[b],
   );
-  const ipdom = computeIpdom(blocks);
+  const ipdom = computeIpdom(blocks, budget);
 
   return { blocks, byStart, blockIndexAt, entry, idom, ipdom, rpo };
 }
@@ -139,22 +146,31 @@ function isBlockEnder(ins: Instr): boolean {
   return (op >= 0xac && op <= 0xb1) || op === 0xbf || op === 0xa9;
 }
 
-function computeRPO(blocks: Block[], entry: number): number[] {
-  const visited = new Set<number>();
+function computeRPO(blocks: Block[], entry: number, budget?: WorkBudget): number[] {
+  const visited = new Set<number>([entry]);
   const order: number[] = [];
-  const dfs = (b: number) => {
-    if (visited.has(b)) return;
-    visited.add(b);
-    for (const s of blocks[b].succs) dfs(s);
-    order.push(b);
-  };
-  dfs(entry);
+  const stack = [{ block: entry, next: 0 }];
+  while (stack.length) {
+    budget?.check(1);
+    const frame = stack[stack.length - 1];
+    const successors = blocks[frame.block].succs;
+    if (frame.next === successors.length) {
+      order.push(frame.block);
+      stack.pop();
+    } else {
+      const next = successors[frame.next++];
+      if (!visited.has(next)) {
+        visited.add(next);
+        stack.push({ block: next, next: 0 });
+      }
+    }
+  }
   order.reverse();
-  for (const b of blocks) if (!visited.has(b.id)) order.push(b.id);
+  for (const block of blocks) if (!visited.has(block.id)) order.push(block.id);
   return order;
 }
 
-function computeIdom(blocks: Block[], entry: number, rpo: number[]): number[] {
+function computeIdom(blocks: Block[], entry: number, rpo: number[], budget?: WorkBudget): number[] {
   const N = blocks.length;
   const idom = new Array<number>(N).fill(-1);
   const rpoIdx = new Array<number>(N).fill(-1);
@@ -163,8 +179,15 @@ function computeIdom(blocks: Block[], entry: number, rpo: number[]): number[] {
     let x = a,
       y = b;
     while (x !== y) {
-      while (rpoIdx[x] > rpoIdx[y]) x = idom[x];
-      while (rpoIdx[y] > rpoIdx[x]) y = idom[y];
+      budget?.check(1);
+      while (rpoIdx[x] > rpoIdx[y]) {
+        budget?.check(1);
+        x = idom[x];
+      }
+      while (rpoIdx[y] > rpoIdx[x]) {
+        budget?.check(1);
+        y = idom[y];
+      }
     }
     return x;
   };
@@ -173,6 +196,7 @@ function computeIdom(blocks: Block[], entry: number, rpo: number[]): number[] {
   while (changed) {
     changed = false;
     for (const b of rpo) {
+      budget?.check(blocks[b].preds.length + 1);
       if (b === entry) continue;
       const preds = blocks[b].preds.filter((p) => idom[p] !== -1);
       if (preds.length === 0) continue;
@@ -190,7 +214,7 @@ function computeIdom(blocks: Block[], entry: number, rpo: number[]): number[] {
   return idom;
 }
 
-function computeIpdom(blocks: Block[]): number[] {
+function computeIpdom(blocks: Block[], budget?: WorkBudget): number[] {
   const N = blocks.length;
   const rsuccs: number[][] = Array.from({ length: N + 1 }, () => []);
   const exitBound = new Set<number>();
@@ -207,6 +231,7 @@ function computeIpdom(blocks: Block[]): number[] {
   const stk: { node: number; i: number }[] = [{ node: N, i: 0 }];
   visited.add(N);
   while (stk.length) {
+    budget?.check(1);
     const fr = stk[stk.length - 1];
     if (fr.i < rsuccs[fr.node].length) {
       const s = rsuccs[fr.node][fr.i++];
@@ -237,8 +262,15 @@ function computeIpdom(blocks: Block[]): number[] {
     let x = a,
       y = b;
     while (x !== y) {
-      while (rpoIdx[x] > rpoIdx[y]) x = idom[x];
-      while (rpoIdx[y] > rpoIdx[x]) y = idom[y];
+      budget?.check(1);
+      while (rpoIdx[x] > rpoIdx[y]) {
+        budget?.check(1);
+        x = idom[x];
+      }
+      while (rpoIdx[y] > rpoIdx[x]) {
+        budget?.check(1);
+        y = idom[y];
+      }
     }
     return x;
   };
@@ -246,6 +278,7 @@ function computeIpdom(blocks: Block[]): number[] {
   while (changed) {
     changed = false;
     for (const b of rpo2) {
+      budget?.check(1);
       if (b === N) continue;
       const preds = predsOf(b).filter((p) => idom[p] !== -1);
       if (preds.length === 0) continue;
@@ -303,4 +336,32 @@ export function naturalLoop(cfg: CFG, src: number, dst: number): Set<number> {
     for (const p of cfg.blocks[x].preds) stack.push(p);
   }
   return loop;
+}
+
+export function exceptionalLoopCFG(
+  cfg: CFG,
+  exceptions: ExceptionEntry[],
+  budget?: WorkBudget,
+): CFG {
+  if (!exceptions.length) return cfg;
+  const blocks = cfg.blocks.map((block) => ({
+    ...block,
+    succs: [...block.succs],
+    preds: [] as number[],
+  }));
+  for (const entry of exceptions) {
+    const handler = cfg.blockIndexAt[entry.handlerPc];
+    for (const block of blocks) {
+      budget?.check(1);
+      if (
+        block.startPc < entry.endPc &&
+        block.endPc > entry.startPc &&
+        !block.succs.includes(handler)
+      )
+        block.succs.push(handler);
+    }
+  }
+  for (const block of blocks) for (const next of block.succs) blocks[next].preds.push(block.id);
+  const rpo = computeRPO(blocks, cfg.entry, budget);
+  return { ...cfg, blocks, rpo, idom: computeIdom(blocks, cfg.entry, rpo, budget) };
 }

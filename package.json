@@ -1,7 +1,7 @@
 {
   "name": "@jar-analyzer/jsd",
   "version": "1.0.3",
-  "description": "Pure TypeScript Java class decompiler — single-file library, no wasm, no native deps",
+  "description": "Pure TypeScript Java class decompiler \u2014 single-file library, no wasm, no native deps",
   "type": "module",
   "main": "./dist/jsd.min.js",
   "types": "./dist/index.d.ts",
@@ -46,9 +46,10 @@
     "test:modern": "npm run build && node test/run-modern.mjs",
     "fuzz": "node test/fuzz.mjs",
     "test:unit": "node test/run-unit.mjs",
-    "test:all": "npm test && node test/run-e2e.mjs --no-debug && node test/run-modern.mjs --require-all && node test/run-modern.mjs --require-all --no-debug && node test/run-package.mjs",
+    "test:all": "npm test && node test/run-e2e.mjs --no-debug && node test/run-modern.mjs --require-all && node test/run-modern.mjs --require-all --no-debug && node test/run-package.mjs && node test/run-validation.mjs",
     "test:nodebug": "npm run build && node test/run-e2e.mjs --no-debug",
-    "test:package": "npm run build && node test/run-package.mjs"
+    "test:package": "npm run build && node test/run-package.mjs",
+    "test:validation": "npm run build && node test/run-validation.mjs"
   },
   "license": "MIT",
   "devDependencies": {

@@ -87,9 +87,8 @@ export class Simulator {
   snapshotDuplicates(ins: Instr, stack: ExprStack, stmts: Stmt[]): void {
     const count = ins.op >= 0x5c && !stack.peek().w ? 2 : 1;
     const needsSnapshot = (e: Expr): boolean =>
-      !['const', 'local', 'this', 'super', 'new-uninit', 'sb-chain', 'class-literal'].includes(
-        e.kind,
-      ) && !(e.kind === 'new-array' && e.initializerProbe === true);
+      !['const', 'local', 'this', 'super', 'new-uninit', 'class-literal'].includes(e.kind) &&
+      !(e.kind === 'new-array' && e.initializerProbe === true);
     if (!stack.items.slice(-count).some((item) => needsSnapshot(item.e))) return;
 
     const replacements = new Map<Expr, Expr>();
@@ -115,6 +114,19 @@ export class Simulator {
       replacements.set(item.e, local);
       item.e = local;
     }
+  }
+
+  snapshotWrite(stack: ExprStack, stmts: Stmt[], pc: number, slot?: number): Map<Expr, Expr> {
+    const saved = new Map<Expr, Expr>();
+    for (let i = 0; i < stack.items.length; i++) {
+      const item = stack.items[i];
+      const value = item.e;
+      if (['const', 'this', 'super', 'new-uninit'].includes(value.kind)) continue;
+      if (value.kind === 'local' && value.slot !== slot) continue;
+      item.e = saved.get(value) ?? this.preserveDiscarded(value, pc, i, stmts, true);
+      saved.set(value, item.e);
+    }
+    return saved;
   }
 
   preserveDiscarded(expr: Expr, pc: number, index: number, stmts: Stmt[], retain: boolean): Expr {
@@ -236,7 +248,13 @@ export class Simulator {
       const endsWithTerm = isTermOp(last.op);
       const exec = endsWithTerm ? b.instrs.slice(0, -1) : b.instrs;
       for (let ii = 0; ii < exec.length; ii++) {
+        const before = stmts.length;
         this.execInstr(exec[ii], stack, stmts, b, ii < exec.length - 1 ? ii : undefined);
+        for (let j = before; j < stmts.length; j++) {
+          const stmt = stmts[j];
+          if (stmt.kind === 'expr' && stmt.expr.kind === 'invoke')
+            stmt.expr.bytecodeOffset ??= exec[ii].pc;
+        }
       }
     } catch (e) {
       if (e instanceof SimFail) throw e;

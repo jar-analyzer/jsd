@@ -83,11 +83,23 @@ function isMonitorExit(s: Stmt, slot?: number): boolean {
   return slot === undefined || m.slot === slot;
 }
 
-export function stripResourceCloses(body: Stmt[], resSlot: number): Stmt[] {
+export function stripResourceCloses(
+  body: Stmt[],
+  resSlot: number,
+  protectedRanges: { start: number; end: number }[] = [],
+): Stmt[] {
   const isClose = (s: Stmt): boolean =>
     s.kind === 'expr' &&
     s.expr.kind === 'invoke' &&
     s.expr.name === 'close' &&
+    s.expr.descriptor === '()V' &&
+    !protectedRanges.some(
+      (range) =>
+        s.expr.kind === 'invoke' &&
+        s.expr.bytecodeOffset !== undefined &&
+        s.expr.bytecodeOffset >= range.start &&
+        s.expr.bytecodeOffset < range.end,
+    ) &&
     s.expr.target?.kind === 'local' &&
     (s.expr.target as { slot: number }).slot === resSlot;
   const mentionsResNull = (e: Expr): boolean => {
@@ -370,7 +382,10 @@ function stripTrailing(body: Stmt[], fin: Stmt[]): Stmt[] {
     }
     if (ok) return body.slice(0, body.length - fin.length);
   }
-  if (body.length >= fin.length + 1 && body[body.length - 1].kind === 'return') {
+  if (
+    body.length >= fin.length + 1 &&
+    ['return', 'break', 'continue', 'throw'].includes(body[body.length - 1].kind)
+  ) {
     const mid = body.slice(body.length - 1 - fin.length, body.length - 1);
     let ok = true;
     for (let i = 0; i < fin.length; i++) {

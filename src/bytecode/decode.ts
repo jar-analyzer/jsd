@@ -35,9 +35,10 @@ export function decodeBytecode(code: Uint8Array): Instr[] {
     let end = pc;
     switch (info.fmt) {
       case 'none':
-      case 'reserved':
         end = pc + 1;
         break;
+      case 'reserved':
+        throw new DecodeError(`reserved opcode at pc ${pc}`);
       case 's1':
         ins.imm = (r.u1() << 24) >> 24;
         end = pc + 2;
@@ -73,17 +74,20 @@ export function decodeBytecode(code: Uint8Array): Instr[] {
       }
       case 'newarray':
         ins.atype = r.u1();
+        if (ins.atype < 4 || ins.atype > 11)
+          throw new DecodeError(`invalid array type at pc ${pc}`);
         end = pc + 2;
         break;
       case 'invokeinterface':
         ins.cpIndex = r.u2();
         ins.count = r.u1();
-        r.u1();
+        if (r.u1() !== 0 || ins.count === 0)
+          throw new DecodeError(`invalid invokeinterface operands at pc ${pc}`);
         end = pc + 5;
         break;
       case 'invokedynamic':
         ins.cpIndex = r.u2();
-        r.u2();
+        if (r.u2() !== 0) throw new DecodeError(`invalid invokedynamic operands at pc ${pc}`);
         end = pc + 5;
         break;
       case 'multianewarray':
@@ -96,6 +100,8 @@ export function decodeBytecode(code: Uint8Array): Instr[] {
         const dflt = r.s4();
         const low = r.s4();
         const high = r.s4();
+        if (high < low || high - low + 1 > Math.floor(r.remaining / 4))
+          throw new DecodeError(`invalid tableswitch range at pc ${pc}`);
         ins.switchDefault = pc + dflt;
         ins.switchCases = [];
         for (let v = low; v <= high; v++) {
@@ -108,10 +114,14 @@ export function decodeBytecode(code: Uint8Array): Instr[] {
         r.seek(pc + 1 + ((4 - ((pc + 1) % 4)) % 4));
         const dflt = r.s4();
         const n = r.s4();
+        if (n < 0 || n > Math.floor(r.remaining / 8))
+          throw new DecodeError(`invalid lookupswitch count at pc ${pc}`);
         ins.switchDefault = pc + dflt;
         ins.switchCases = [];
         for (let i = 0; i < n; i++) {
           const v = r.s4();
+          if (i > 0 && v <= ins.switchCases[i - 1].value)
+            throw new DecodeError(`unordered lookupswitch keys at pc ${pc}`);
           ins.switchCases.push({ value: v, target: pc + r.s4() });
         }
         end = r.offset;

@@ -3,7 +3,7 @@ import { recoverResources } from './resources.js';
 import { Stmt } from '../../ast/ast.js';
 import { StructFail } from './types.js';
 import type { RangeGroup, WalkCtx } from './types.js';
-import { stripMonitorExits, stripTrailingDeep } from './stmtstrip.js';
+import { stripMonitorExits } from './stmtstrip.js';
 import type { Structurer } from './index.js';
 
 export const tryPart: ThisType<Structurer> &
@@ -176,7 +176,6 @@ export const tryPart: ThisType<Structurer> &
     }
 
     body = this.walk(entryBlock, bodyBlocks, new Set([...tryFollow]), wctx);
-    if (group.finallyBody) body = stripTrailingDeep(body, group.finallyBody);
 
     const catches: {
       type: string | null;
@@ -220,8 +219,7 @@ export const tryPart: ThisType<Structurer> &
       }
       const handlerSet = this.handlerOwned(hb, nodes);
       const hBody = this.walk(hb, handlerSet, new Set([...tryFollow]), wctx);
-      const hBody2 = group.finallyBody ? stripTrailingDeep(hBody, group.finallyBody) : hBody;
-      catches.push({ type: h.catchType, body: hBody2, varName, varSlot, extraTypes: [] });
+      catches.push({ type: h.catchType, body: hBody, varName, varSlot, extraTypes: [] });
     }
 
     if (matchGuard) {

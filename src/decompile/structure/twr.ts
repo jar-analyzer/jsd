@@ -1,7 +1,7 @@
 import { Expr, Stmt } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import type { RangeGroup, RecoveredStatement } from './types.js';
-import { inferInitTypeSimple } from './stmtstrip.js';
+import { inferInitTypeSimple, stripResourceCloses } from './stmtstrip.js';
 import type { Structurer } from './index.js';
 
 export function detectTwr(
@@ -128,7 +128,23 @@ export function detectTwr(
   for (const g2 of state.rangeGroups) {
     if (g2.done) continue;
     const insideSynth = synth.some((g3) => g2.start >= g3.start - 8 && g2.end <= g3.end + 30);
-    if (insideSynth) {
+    if (
+      insideSynth &&
+      g2.handlers.every((handler) => {
+        if (handler.catchType !== 'java/lang/Throwable') return false;
+        const block = state.blockOfPc(handler.handlerPc);
+        return (
+          block >= 0 &&
+          state.sim.stmts[block].some(
+            (stmt) =>
+              stmt.kind === 'expr' &&
+              stmt.expr.kind === 'invoke' &&
+              stmt.expr.name === 'addSuppressed' &&
+              stmt.expr.descriptor === '(Ljava/lang/Throwable;)V',
+          )
+        );
+      })
+    ) {
       g2.done = true;
       for (const hh of g2.handlers) {
         state.consumedHandlerPcs.add(hh.handlerPc);
@@ -181,7 +197,7 @@ export function detectTwr(
   for (const b of nodes) {
     if (bodyBlocks.has(b) || state.claimed[b]) continue;
     const pc = state.cfg.blocks[b].startPc;
-    if (pc >= group.start && pc <= wholeEnd) state.claimed[b] = true;
+    if (pc >= group.start && pc < wholeEnd) state.claimed[b] = true;
   }
   const bodyExits = new Set<number>();
   for (const b of bodyBlocks) {
@@ -190,23 +206,14 @@ export function detectTwr(
     }
   }
 
-  const body = state.walk(state.blockOfPc(innermost.start), bodyBlocks, bodyExits, {
+  let body = state.walk(state.blockOfPc(innermost.start), bodyBlocks, bodyExits, {
     implicitEnds: new Set(),
     breakables: [],
   });
-  const lastRes = resSlots[resSlots.length - 1];
-  for (let i = body.length - 1; i >= 0; i--) {
-    const st = body[i];
-    if (
-      st.kind === 'expr' &&
-      st.expr.kind === 'invoke' &&
-      st.expr.name === 'close' &&
-      st.expr.target?.kind === 'local' &&
-      (st.expr.target as { slot: number }).slot === lastRes
-    ) {
-      body.splice(i, 1);
-      break;
-    }
+
+  for (const slot of resSlots) {
+    const ranges = synth.filter((_, index) => resSlots[index] === slot);
+    body = stripResourceCloses(body, slot, ranges);
   }
 
   const cont = new Set<number>();

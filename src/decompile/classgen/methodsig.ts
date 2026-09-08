@@ -192,6 +192,7 @@ export function isCanonicalRecordCtor(m: MethodInfo, stmtsIn: Stmt[], cls: Class
       : stmtsIn;
   if (stmts.length && stmts[stmts.length - 1].kind === 'return') stmts = stmts.slice(0, -1);
   if (stmts.length !== cls.recordComponents.length) return false;
+  let slot = 1;
   for (let i = 0; i < stmts.length; i++) {
     const s = stmts[i];
     if (s.kind !== 'expr' || s.expr.kind !== 'assign-expr' || s.expr.target.kind !== 'field')
@@ -200,6 +201,9 @@ export function isCanonicalRecordCtor(m: MethodInfo, stmtsIn: Stmt[], cls: Class
     const targetExpr = t.target as { kind?: string } | undefined;
     if (!targetExpr || targetExpr.kind !== 'this') return false;
     if (t.name !== cls.recordComponents[i].name) return false;
+    if (s.expr.op || s.expr.expr.kind !== 'local' || s.expr.expr.slot !== slot) return false;
+    const type = md.params[i];
+    slot += type.kind === 'prim' && ['long', 'double'].includes(type.name) ? 2 : 1;
   }
   return true;
 }

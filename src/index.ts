@@ -39,7 +39,34 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
   const classes = new Map<string, ClassFile>();
   const inputClasses = new Map<string, ClassFile>();
   const loadErrors = new Map<string, DecompileDiagnostic>();
+  const inputSizes = new Map<ClassFile, number>();
+  let totalInputBytes = 0;
   let lastDiagnostics: DecompileDiagnostic[] = [];
+
+  const remove = (cf: ClassFile): void => {
+    if (classes.get(cf.name) !== cf) return;
+    classes.delete(cf.name);
+    for (const [name, input] of inputClasses) if (input === cf) inputClasses.delete(name);
+    totalInputBytes -= inputSizes.get(cf) ?? 0;
+    inputSizes.delete(cf);
+  };
+  const load = (data: Uint8Array): ClassFile => {
+    const budget = new WorkBudget(options);
+    budget.input(data.byteLength);
+    const cf = parseClass(data, (name) => {
+      const previous = classes.get(name);
+      budget.inputs(
+        totalInputBytes - (previous ? (inputSizes.get(previous) ?? 0) : 0) + data.byteLength,
+        classes.size + (previous ? 0 : 1),
+      );
+    });
+    const previous = classes.get(cf.name);
+    if (previous) remove(previous);
+    classes.set(cf.name, cf);
+    inputSizes.set(cf, data.byteLength);
+    totalInputBytes += data.byteLength;
+    return cf;
+  };
 
   const decompileAllDetailed = (): DecompileReport => {
     const budget = new WorkBudget(options);
@@ -103,9 +130,14 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       collectOwn(cls, own);
       reachable.add(cls.name);
       for (const name of own) reachable.add(name);
-      const nested = (children.get(cls.name) ?? []).map(
-        (child) => render(child, false, diagnostics).source,
-      );
+      const nested: string[] = [];
+      let nestedChars = 0;
+      for (const child of children.get(cls.name) ?? []) {
+        const source = render(child, false, diagnostics).source;
+        nestedChars += source.length;
+        budget.previewOutput(nestedChars);
+        nested.push(source);
+      }
       const ctx = new Ctx(cls, classes, options, diagnostics, budget);
       return generateClass(ctx, cls, standalone, nested, own);
     };
@@ -148,9 +180,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
 
   return {
     addClass(data) {
-      new WorkBudget(options).input(data.byteLength);
-      const cf = parseClass(data);
-      classes.set(cf.name, cf);
+      const cf = load(data);
       lastDiagnostics = [];
       return cf;
     },
@@ -158,13 +188,11 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       lastDiagnostics = [];
       for (const [name, data] of map) {
         const previous = inputClasses.get(name);
-        if (previous && classes.get(previous.name) === previous) classes.delete(previous.name);
+        if (previous) remove(previous);
         inputClasses.delete(name);
         loadErrors.delete(name);
         try {
-          new WorkBudget(options).input(data.byteLength);
-          const cf = parseClass(data);
-          classes.set(cf.name, cf);
+          const cf = load(data);
           inputClasses.set(name, cf);
         } catch (error) {
           loadErrors.set(name, {
@@ -191,6 +219,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
 export function decompileClassFile(data: Uint8Array, options?: DecompileOptions): ClassSource {
   const budget = new WorkBudget(options ?? {});
   budget.input(data.byteLength);
+  budget.inputs(data.byteLength, 1);
   const cf = parseClass(data);
   if (shouldSkip(cf)) {
     return {

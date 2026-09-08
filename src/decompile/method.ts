@@ -1,3 +1,5 @@
+import { DecompileLimitError } from './budget.js';
+import { verifyFrames } from './verify.js';
 import { validateStackMaps } from './stackmap.js';
 import { splitLocalSlots } from './locals.js';
 import { errorMessage, type DiagnosticStage } from './diagnostics.js';
@@ -78,6 +80,7 @@ export function decompileMethod(ctx: Ctx, cls: ClassFile, method: MethodInfo): M
   try {
     out = decompileMethodImpl(ctx, cls, method);
   } catch (e) {
+    if (e instanceof DecompileLimitError) throw e;
     out = {
       stmts: [],
       failed: `internal error: ${errorMessage(e)}`,
@@ -108,8 +111,10 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
     ctx.budget.check(code.code.length);
     instrs = decodeBytecode(code.code);
     validateStackMaps(method, instrs);
+    verifyFrames(ctx, cls, method, instrs);
     instrs = foldConstBranches(instrs, method);
   } catch (e) {
+    if (e instanceof DecompileLimitError) throw e;
     return {
       stmts: [],
       failed: `decode error: ${errorMessage(e)}`,
@@ -122,10 +127,12 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
     leaders.add(ex.handlerPc);
     leaders.add(ex.startPc);
   }
+  for (const frame of code.stackMapFrames ?? []) leaders.add(frame.offset);
   let cfg;
   try {
-    cfg = buildCFG(instrs, leaders, new Set(code.exceptions.map((ex) => ex.handlerPc)));
+    cfg = buildCFG(instrs, leaders, new Set(code.exceptions.map((ex) => ex.handlerPc)), ctx.budget);
   } catch (e) {
+    if (e instanceof DecompileLimitError) throw e;
     return { stmts: [], failed: errorMessage(e), failedStage: 'cfg', disasm: disassemble(method) };
   }
   ctx.budget.check();
@@ -154,6 +161,7 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
   try {
     stmts = applyPatterns(ctx, cls, method, stmts, sim);
   } catch (e) {
+    if (e instanceof DecompileLimitError) throw e;
     return {
       stmts: [],
       failed: `transform error: ${errorMessage(e)}`,
@@ -244,6 +252,7 @@ export function disassemble(method: MethodInfo): string {
       lines.push(`${pad(ins.pc)}: ${ins.name}${operand}`);
     }
   } catch (e) {
+    if (e instanceof DecompileLimitError) throw e;
     lines.push(`(disassembly failed: ${(e as Error).message})`);
   }
   if (code.exceptions.length) {
