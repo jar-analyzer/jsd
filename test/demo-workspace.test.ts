@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Workspace, classFamily } from '../demo/workspace.js';
+import { Workspace, classFamily } from '../docs/workspace.js';
 
 const bytes = new Uint8Array([1]);
 const report = (name: string, status = 'success') => ({

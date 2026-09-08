@@ -39,7 +39,7 @@
     "format:check": "prettier --check .",
     "build": "tsc --emitDeclarationOnly && node scripts/build.mjs",
     "release": "node scripts/publish.mjs",
-    "sync": "cp dist/jsd.min.js demo/jsd.browser.js",
+    "sync": "cp dist/jsd.min.js docs/jsd.browser.js",
     "check": "tsc --noEmit",
     "test": "npm run build && npm run test:unit && node test/run-e2e.mjs",
     "test:modern": "npm run build && node test/run-modern.mjs",

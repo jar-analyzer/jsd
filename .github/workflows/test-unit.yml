@@ -25,4 +25,4 @@ jobs:
       - run: npm run build
       - run: npm run test:unit
       - name: Verify checked-in browser bundle
-        run: cmp dist/jsd.min.js demo/jsd.browser.js
+        run: cmp dist/jsd.min.js docs/jsd.browser.js

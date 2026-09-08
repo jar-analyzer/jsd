@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TreeState } from '../demo/tree-state.js';
+import { TreeState } from '../docs/tree-state.js';
 
 test('adding archive contents refreshes the tree without resetting directory state', () => {
   const state = new TreeState();

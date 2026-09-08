@@ -27,7 +27,7 @@ function view() {
     },
     createElement: element,
   };
-  const source = readFileSync('demo/view.js', 'utf8')
+  const source = readFileSync('docs/view.js', 'utf8')
     .replace(/^import .*;\n/gm, '')
     .replace(/^export /gm, '');
   const context: any = { document, t: (key: string) => key };

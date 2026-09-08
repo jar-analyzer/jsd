@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collectClasses } from '../demo/files.js';
+import { collectClasses } from '../docs/files.js';
 
 const bytes = new Uint8Array([1]);
 

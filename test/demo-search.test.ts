@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findMatches, matchFiles } from '../demo/search-model.js';
+import { findMatches, matchFiles } from '../docs/search-model.js';
 
 test('source search treats regular expression punctuation as literal text', () => {
   assert.deepEqual(findMatches('a.b aXb a.b', 'a.b').matches, [

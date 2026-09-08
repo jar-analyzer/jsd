@@ -1,6 +1,6 @@
 node_modules/
 dist/
-demo/jsd.browser.js
+docs/jsd.browser.js
 test/fixtures-modern/ModernJdk25.java
 package-lock.json
 coverage/
