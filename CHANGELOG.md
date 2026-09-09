@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.1.1
+
+release date:
+
+- Reduce redundant casts in fluent calls.
+- Remove unused compiler-generated locals.
+- Improve local-variable usage analysis.
+- Expand regression coverage.
+
 ## 1.1.0
 
 release date: 2026.09.09

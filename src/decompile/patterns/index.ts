@@ -1,3 +1,4 @@
+import { removeUnusedLocals } from './unused.js';
 import { parseMethodDescriptor } from '../../classfile/types.js';
 import type { ClassFile, MethodInfo } from '../../classfile/model.js';
 import type { Ctx } from '../context.js';
@@ -78,7 +79,7 @@ export function applyPatterns(
   out = foldTernary(out, sim, bctx);
   out = foldBoolTernary(out);
   for (let i = 0; i < 6; i++) {
-    const next = propagateTemps(out);
+    const next = propagateTemps(removeUnusedLocals(out));
     if (next === out) break;
     out = next;
   }

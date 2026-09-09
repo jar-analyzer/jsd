@@ -1,4 +1,4 @@
-import { prepareExpression } from '../java/expressions.js';
+import { prepareExpression, sameRawReferenceType } from '../java/expressions.js';
 import { expressionType } from '../../ast/types.js';
 import { initialType } from '../java/types.js';
 import { javaLiteral } from './literals.js';
@@ -18,11 +18,23 @@ import { typeStr, nestedDisplay, simpleOf } from './types.js';
 
 export { escapeString } from './literals.js';
 
-export function exprStr(e: Expr, rc: RenderCtx, prec = 0, valueRequired = true): string {
+export function exprStr(
+  e: Expr,
+  rc: RenderCtx,
+  prec = 0,
+  valueRequired = true,
+  enclosingCast?: JType,
+): string {
   const prepared = prepareExpression(e, rc.ctx);
   let [s, p] = exprPrec(prepared, rc);
-  if (valueRequired && prepared.kind === 'invoke' && prepared.eraseResult) {
-    s = `(${typeStr(parseMethodDescriptor(prepared.descriptor).ret, rc)}) (${s})`;
+  if (
+    valueRequired &&
+    prepared.kind === 'invoke' &&
+    prepared.eraseResult &&
+    !sameRawReferenceType(enclosingCast, parseMethodDescriptor(prepared.descriptor).ret)
+  ) {
+    const operand = p < PREC.unary ? `(${s})` : s;
+    s = `(${typeStr(parseMethodDescriptor(prepared.descriptor).ret, rc)}) ${operand}`;
     p = PREC.cast;
   }
   rc.ctx?.budget.previewOutput(s.length + (p < prec ? 2 : 0));
@@ -75,7 +87,10 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
     }
     case 'cast': {
       const t = typeStr(e.jtype, rc);
-      const inner = exprStr(e.expr, rc, PREC.unary);
+      let operand = e.expr;
+      while (operand.kind === 'cast' && sameRawReferenceType(e.jtype, operand.jtype))
+        operand = operand.expr;
+      const inner = exprStr(operand, rc, PREC.unary, true, e.jtype);
       return [`(${t}) ${inner}`, PREC.cast];
     }
     case 'instanceof': {

@@ -1,0 +1,4 @@
+{
+  "stdout": "object:one;object:two;\ntyped:seven;typed:eight;\nobject:three;object:four;\nobject:five;object:six;\n",
+  "dependencies": ["FluentBuilder.class", "GenericFluent.class"]
+}

@@ -14,14 +14,20 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
     const args = e.args.map((arg, i) =>
       adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw, true),
     );
+    const ownerType: JType = { kind: 'class', name: e.owner };
+    const rawTarget =
+      e.target &&
+      ['local', 'cast', 'new'].includes(e.target.kind) &&
+      sameRawReferenceType(receiver, ownerType);
     const target =
       e.target &&
       !e.superCall &&
+      !rawTarget &&
       !ctx.lookup(e.owner) &&
       args.some((arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim')
         ? {
             kind: 'cast' as const,
-            jtype: { kind: 'class' as const, name: e.owner },
+            jtype: ownerType,
             expr: e.target,
           }
         : e.target;
@@ -83,4 +89,18 @@ function adaptConst(v: Expr, targetType: JType): Expr {
     }
   }
   return v;
+}
+
+export function sameRawReferenceType(a: JType | undefined, b: JType | undefined): boolean {
+  if (a?.kind === 'array' && b?.kind === 'array') {
+    if (a.elem.kind === 'prim' && b.elem.kind === 'prim') return a.elem.name === b.elem.name;
+    return sameRawReferenceType(a.elem, b.elem);
+  }
+  return (
+    a?.kind === 'class' &&
+    b?.kind === 'class' &&
+    a.name === b.name &&
+    !a.args?.length &&
+    !b.args?.length
+  );
 }

@@ -12,7 +12,7 @@
 
 A TypeScript Java `.class` decompiler for Node.js and browsers.
 
-**Single ESM bundle: approximately 238 KB, or 72 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
+**Single ESM bundle: approximately 239 KB, or 72 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
 
 Supports common control flow, lambdas, nested classes, records and selected Java features through Java 25. Intended as the decompilation engine for the next generation of **jar-analyzer**.
 

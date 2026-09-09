@@ -132,3 +132,79 @@ test('builder append chains and concatenations retain string conversion for prim
     'new StringBuilder().append(false).append(7)',
   );
 });
+
+test('external fluent calls apply each receiver/result cast only once', () => {
+  const builder = 'example/Builder';
+  let expr: Expr = {
+    kind: 'invoke',
+    mode: 'static',
+    owner: 'example/Commander',
+    name: 'newBuilder',
+    descriptor: `()L${builder};`,
+    args: [],
+  };
+  for (let i = 0; i < 3; i++)
+    expr = {
+      kind: 'invoke',
+      mode: 'virtual',
+      owner: builder,
+      name: 'addCommand',
+      descriptor: `(Ljava/lang/Object;)L${builder};`,
+      target: expr,
+      args: [{ kind: 'const', ctype: 'string', value: `command${i}` }],
+    };
+  const before = structuredClone(expr);
+  freeze(expr);
+  const output = exprStr(expr, context());
+  assert.equal((output.match(/\(example\.Builder\)/g) ?? []).length, 4);
+  assert.equal(
+    output,
+    '(example.Builder) ((example.Builder) ((example.Builder) ((example.Builder) example.Commander.newBuilder()).addCommand((java.lang.Object) "command0")).addCommand((java.lang.Object) "command1")).addCommand((java.lang.Object) "command2")',
+  );
+  assert.equal(exprStr(expr, context()), output);
+  assert.deepEqual(expr, before);
+});
+
+test('raw local receivers avoid extra casts while parameterized receivers keep erasure', () => {
+  for (const parameterized of [false, true]) {
+    const expr: Expr = {
+      kind: 'invoke',
+      mode: 'virtual',
+      owner: 'example/Builder',
+      name: 'add',
+      descriptor: '(Ljava/lang/Object;)V',
+      target: {
+        kind: 'local',
+        slot: 1,
+        name: 'builder',
+        jtype: {
+          kind: 'class',
+          name: 'example/Builder',
+          ...(parameterized
+            ? { args: [{ kind: 'class' as const, name: 'java/lang/String' }] }
+            : {}),
+        },
+      },
+      args: [{ kind: 'const', ctype: 'string', value: 'command' }],
+    };
+    const output = exprStr(expr, context());
+    assert.equal(output.includes('(example.Builder)'), parameterized);
+    assert.match(output, /add\(\(java.lang.Object\) "command"\)/);
+  }
+});
+
+test('identical raw casts collapse but intervening checked and generic casts remain', () => {
+  const type = { kind: 'class' as const, name: 'example/Builder' };
+  const value: Expr = { kind: 'local', slot: 1, name: 'value' };
+  const cast = (expr: Expr): Expr => ({ kind: 'cast', jtype: type, expr });
+  const expr = cast(cast(cast(value)));
+  freeze(expr);
+  assert.equal(exprStr(expr, context()), '(example.Builder) var1');
+  for (const intermediate of [
+    { kind: 'class' as const, name: 'example/Other' },
+    { ...type, args: [{ kind: 'class' as const, name: 'java/lang/String' }] },
+  ]) {
+    const output = exprStr(cast({ kind: 'cast', jtype: intermediate, expr: value }), context());
+    assert.equal((output.match(/\) /g) ?? []).length, 2);
+  }
+});
