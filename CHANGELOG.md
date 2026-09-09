@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## 1.1.0 dev
+## 1.1.0
 
-release date:
+release date: 2026.09.09
 
 - Improve dynamic bytecode support.
 - Improve lambda and method reference recovery.
