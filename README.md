@@ -12,7 +12,7 @@
 
 A TypeScript Java `.class` decompiler for Node.js and browsers.
 
-**Single ESM bundle: approximately 241 KB, or 73 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
+**Single ESM bundle: approximately 252 KB, or 77 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
 
 Supports common control flow, lambdas, nested classes, records and selected Java features through Java 25. Intended as the decompilation engine for the next generation of **jar-analyzer**.
 
@@ -74,8 +74,8 @@ Other optional limits: `maxTotalInputBytes` (batch size), `maxClasses` (class co
 | Suite           | Coverage                                                            | CI environment                             |
 | --------------- | ------------------------------------------------------------------- | ------------------------------------------ |
 | Quality         | Formatting and types; CI also checks browser bundle consistency     | Node.js 24                                 |
-| Unit            | 216 engine and demo cases                                           | Node.js 24                                 |
-| Java round-trip | 138 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
+| Unit            | 292 engine and demo cases                                           | Node.js 24                                 |
+| Java round-trip | 144 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
 | Modern Java     | Up to 14 Java 9–25 cases, with and without debug information        | JDK 21, 25                                 |
 | Bytecode        | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks   | JDK 11, 17, 21, 25                         |
 | Package         | Installation, type declarations, ESM, public APIs and license       | Node.js 20, 24                             |

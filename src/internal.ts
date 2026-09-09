@@ -12,3 +12,4 @@ export * from './decompile/printer/index.js';
 export * from './decompile/method.js';
 export * from './decompile/classgen/index.js';
 export * from './decompile/lambdas.js';
+export { formatJavaSource } from './decompile/format/index.js';

@@ -1,3 +1,4 @@
+import type { JavaFormatOptions } from './format/index.js';
 import type { Expr } from '../ast/ast.js';
 import { WorkBudget } from './budget.js';
 import { DiagnosticBag } from './diagnostics.js';
@@ -7,6 +8,7 @@ import { parseFieldDescriptor, parseMethodDescriptor, parseSignature } from '../
 import type { LocalVarEntry } from '../classfile/model.js';
 
 export interface DecompileOptions {
+  javaFormat?: JavaFormatOptions;
   maxInputBytes?: number;
   maxTotalInputBytes?: number;
   maxClasses?: number;

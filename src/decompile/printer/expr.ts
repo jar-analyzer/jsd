@@ -38,7 +38,7 @@ export function exprStr(
     s = `(${typeStr(parseMethodDescriptor(prepared.descriptor).ret, rc)}) ${operand}`;
     p = PREC.cast;
   }
-  rc.ctx?.budget.previewOutput(s.length + (p < prec ? 2 : 0));
+  rc.ctx?.budget.previewSource(s);
   return p < prec ? `(${s})` : s;
 }
 

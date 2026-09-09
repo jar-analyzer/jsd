@@ -1,3 +1,4 @@
+import { formatJavaSource } from '../format/index.js';
 import { OutputLines } from '../budget.js';
 import type { AnonInfo } from '../printer/context.js';
 import {
@@ -107,20 +108,10 @@ export class ClassGenerator {
       if (imports.length) head.push(...imports.map((i) => `import ${i};`), '');
     }
     this.renderBody();
-    this.ctx.budget.previewOutput(
-      [...head, ...this.out].reduce((sum, line) => sum + line.length + 1, 0),
-    );
     let body = [...head, ...this.out].join('\n');
     if (this.nestedBodies.length) {
       const i = body.lastIndexOf('}');
       const indent = this.standalone ? '' : '    ';
-      this.ctx.budget.previewOutput(
-        body.length +
-          this.nestedBodies.reduce(
-            (sum, text) => sum + text.length + (indent.length + 4) * text.split('\n').length + 1,
-            0,
-          ),
-      );
       const nestedText = this.nestedBodies
         .map((b) =>
           b
@@ -131,7 +122,8 @@ export class ClassGenerator {
         .join('\n');
       body = body.slice(0, i) + nestedText + '\n' + indent + body.slice(i);
     }
-    const source = body + '\n';
+    this.ctx.budget.previewSource(body);
+    const source = formatJavaSource(body + '\n', this.ctx.opts.javaFormat, this.ctx.budget);
     this.ctx.budget.check();
     if (this.standalone) this.ctx.budget.outputChars(source.length);
     const simple = this.cls.name.slice(this.cls.name.lastIndexOf('/') + 1);

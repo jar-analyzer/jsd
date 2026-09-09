@@ -59,6 +59,9 @@ export class WorkBudget {
     )
       throw new DecompileLimitError('Generated source size limit exceeded');
   }
+  previewSource(source: string): void {
+    this.previewOutput(source.replace(/\s/g, '').length);
+  }
   outputChars(chars: number): void {
     this.previewOutput(chars);
     this.output += chars;
@@ -74,7 +77,7 @@ export class OutputLines extends Array<string> {
     return Array;
   }
   override push(...lines: string[]): number {
-    const chars = lines.reduce((sum, line) => sum + line.length + 1, this.chars);
+    const chars = lines.reduce((sum, line) => sum + line.replace(/\s/g, '').length, this.chars);
     this.budget.previewOutput(chars);
     this.chars = chars;
     return super.push(...lines);

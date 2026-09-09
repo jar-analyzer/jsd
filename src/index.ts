@@ -1,3 +1,4 @@
+export type { JavaFormatOptions } from './decompile/format/index.js';
 import { WorkBudget, DecompileLimitError } from './decompile/budget.js';
 export { DecompileLimitError } from './decompile/budget.js';
 import { parseClass } from './classfile/parser.js';

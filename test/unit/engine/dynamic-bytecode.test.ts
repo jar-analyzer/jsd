@@ -110,7 +110,7 @@ test('MethodType constants produce a typed methodType factory expression', () =>
   assert.equal(result.status, 'success');
   assert.match(
     result.source,
-    /MethodType.methodType\(void.class, new Class\[\] \{ int.class, String\[\].class \}\)/,
+    /MethodType.methodType\(void.class, new Class\[\] \{int.class, String\[\].class\}\)/,
   );
 });
 
