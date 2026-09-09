@@ -1,0 +1,4 @@
+{
+  "stdout": "false\ntrue\nfalse\ntrue\nx\n",
+  "dependencies": ["ExternalPrimitiveState.class"]
+}

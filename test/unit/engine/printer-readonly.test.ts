@@ -158,8 +158,11 @@ test('external fluent calls apply each receiver/result cast only once', () => {
   const output = exprStr(expr, context());
   assert.equal((output.match(/\(example\.Builder\)/g) ?? []).length, 4);
   assert.equal(
-    output,
-    '(example.Builder) ((example.Builder) ((example.Builder) ((example.Builder) example.Commander.newBuilder()).addCommand((java.lang.Object) "command0")).addCommand((java.lang.Object) "command1")).addCommand((java.lang.Object) "command2")',
+    output.replace(/\s/g, ''),
+    '(example.Builder) ((example.Builder) ((example.Builder) ((example.Builder) example.Commander.newBuilder()).addCommand((java.lang.Object) "command0")).addCommand((java.lang.Object) "command1")).addCommand((java.lang.Object) "command2")'.replace(
+      /\s/g,
+      '',
+    ),
   );
   assert.equal(exprStr(expr, context()), output);
   assert.deepEqual(expr, before);
@@ -207,4 +210,115 @@ test('identical raw casts collapse but intervening checked and generic casts rem
     const output = exprStr(cast({ kind: 'cast', jtype: intermediate, expr: value }), context());
     assert.equal((output.match(/\) /g) ?? []).length, 2);
   }
+});
+
+test('named locals reusing a slot do not inherit another variable type', () => {
+  const stmts: Stmt[] = [
+    {
+      kind: 'if',
+      cond: { kind: 'const', ctype: 'boolean', value: true },
+      thenS: [
+        {
+          kind: 'expr',
+          expr: {
+            kind: 'assign-expr',
+            target: {
+              kind: 'local',
+              slot: 1,
+              name: 'ok',
+              jtype: { kind: 'prim', name: 'boolean' },
+            },
+            expr: { kind: 'const', ctype: 'int', value: 1 },
+          },
+        },
+      ],
+    },
+    {
+      kind: 'expr',
+      expr: {
+        kind: 'assign-expr',
+        target: {
+          kind: 'local',
+          slot: 1,
+          name: 'commander',
+          jtype: { kind: 'class', name: 'Commander' },
+        },
+        expr: { kind: 'new', owner: 'Commander', args: [] },
+      },
+    },
+  ];
+  const output = renderStmts(stmts, context(), 0).join('\n');
+  assert.match(output, /Commander commander = new Commander\(\);/);
+  assert.doesNotMatch(output, /commander2/);
+});
+
+test('block lambdas retain nested statements and enclosing indentation', () => {
+  const call = (name: string, args: Expr[] = []): Expr => ({
+    kind: 'invoke',
+    mode: 'static',
+    owner: 'ReadOnly',
+    name,
+    descriptor: args.length ? '(Ljava/lang/Runnable;)V' : '()V',
+    args,
+  });
+  const lambda: Expr = {
+    kind: 'lambda',
+    params: [],
+    body: [
+      {
+        kind: 'if',
+        cond: { kind: 'const', ctype: 'boolean', value: true },
+        thenS: [{ kind: 'expr', expr: call('show') }, { kind: 'return' }],
+      },
+      { kind: 'expr', expr: call('finish') },
+    ],
+  };
+  const source: Stmt[] = [
+    {
+      kind: 'expr',
+      expr: call('listen', [
+        { kind: 'cast', jtype: { kind: 'class', name: 'java/lang/Runnable' }, expr: lambda },
+      ]),
+    },
+  ];
+  const before = structuredClone(source);
+  freeze(source);
+  assert.equal(
+    renderStmts(source, context(), 2).join('\n'),
+    [
+      '        listen((java.lang.Runnable) (() -> {',
+      '            if (true) {',
+      '                show();',
+      '                return;',
+      '            }',
+      '            finish();',
+      '        }));',
+    ].join('\n'),
+  );
+  assert.deepEqual(source, before);
+});
+
+test('nested block lambdas accumulate one indentation level per body', () => {
+  const inner: Expr = { kind: 'lambda', params: [], body: [{ kind: 'return' }] };
+  const expr: Expr = {
+    kind: 'lambda',
+    params: [],
+    body: [
+      {
+        kind: 'expr',
+        expr: {
+          kind: 'invoke',
+          mode: 'static',
+          owner: 'ReadOnly',
+          name: 'listen',
+          descriptor: '(Ljava/lang/Runnable;)V',
+          args: [inner],
+        },
+      },
+    ],
+  };
+  assert.equal(
+    exprStr(expr, context()),
+    ['() -> {', '    listen(() -> {', '        return;', '    });', '}'].join('\n'),
+  );
 });

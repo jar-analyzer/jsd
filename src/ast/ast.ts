@@ -110,7 +110,7 @@ export type UnaryOp = '-' | '!' | '~' | '+' | '++x' | '--x' | 'x++' | 'x--';
 
 export type AssignTarget =
   | { kind: 'local'; slot: number; name: string; jtype?: JType; temporary?: boolean }
-  | { kind: 'field'; owner: string; name: string; target?: Expr }
+  | { kind: 'field'; owner: string; name: string; target?: Expr; jtype?: JType }
   | { kind: 'array'; array: Expr; index: Expr };
 
 export type Stmt =

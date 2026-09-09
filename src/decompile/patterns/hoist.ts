@@ -11,6 +11,7 @@ export function hoistWideScopeLocals(
   typeOf: (slot: number) => JType | undefined,
   hoistable?: (slot: number) => boolean,
 ): HoistResult {
+  const boundSlots = new Set<number>();
   let nextId = 0;
   const parent = new Map<number, number>();
   const firstAssign = new Map<number, number>();
@@ -22,6 +23,7 @@ export function hoistWideScopeLocals(
     }
   };
   const addRef = (slot: number, name: string, listId: number): void => {
+    if (boundSlots.has(slot)) return;
     let arr = refs.get(slot);
     if (!arr) refs.set(slot, (arr = []));
     arr.push({ list: listId, name });
@@ -40,6 +42,7 @@ export function hoistWideScopeLocals(
           const slot = (e.target as { slot: number }).slot;
           if (!firstAssign.has(slot)) firstAssign.set(slot, listId);
           addRef(slot, (e.target as { name: string }).name, listId);
+          visitExpr(e.expr, listId);
         } else if (
           e.kind === 'unary' &&
           ['x++', 'x--', '++x', '--x'].includes(e.op) &&
@@ -89,8 +92,10 @@ export function hoistWideScopeLocals(
       case 'try':
         child(st.body);
         for (const c of st.catches) {
+          const bound = c.varSlot !== undefined && !boundSlots.has(c.varSlot);
+          if (bound) boundSlots.add(c.varSlot!);
           child(c.body);
-          if (c.varSlot !== undefined) addRef(c.varSlot, c.varName ?? 'e', listId);
+          if (bound) boundSlots.delete(c.varSlot!);
         }
         child(st.finallyS);
         break;

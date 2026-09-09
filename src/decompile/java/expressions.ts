@@ -46,7 +46,7 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
       ),
     };
   if (e.kind === 'assign-expr' && e.target.kind === 'field') {
-    const type = ctx.fieldTypeInfo(e.target.owner, e.target.name);
+    const type = e.target.jtype ?? ctx.fieldTypeInfo(e.target.owner, e.target.name);
     if (type) return { ...e, expr: adaptPrimitiveValue(e.expr, type) };
   }
   if (e.kind === 'array-init')

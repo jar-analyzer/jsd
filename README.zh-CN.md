@@ -12,7 +12,7 @@
 
 TypeScript 实现的 Java `.class` 反编译库，支持 Node.js 和浏览器。
 
-**单个 ESM 文件约 239 KB，gzip 后约 72 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
+**单个 ESM 文件约 241 KB，gzip 后约 73 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
 
 支持常见控制流、lambda、嵌套类、record 及 Java 25 的部分语法。将作为下一代 **jar-analyzer** 的反编译引擎。
 

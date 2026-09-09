@@ -4,9 +4,12 @@
 
 release date:
 
+- Improve generated Java formatting.
 - Reduce redundant casts in fluent calls.
 - Remove unused compiler-generated locals.
-- Improve local-variable usage analysis.
+- Improve local-variable usage and scope recovery.
+- Preserve short-circuit branches.
+- Preserve external primitive field assignments.
 - Expand regression coverage.
 
 ## 1.1.0

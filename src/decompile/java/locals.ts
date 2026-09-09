@@ -52,6 +52,7 @@ export function prepareLocalAssignment(
         )
       : e.expr;
   const reuse =
+    !redeclare &&
     type &&
     previous &&
     !compatibleTypes(previous, type) &&

@@ -1,3 +1,4 @@
+import { indentJava } from './layout.js';
 import { OutputLines } from '../budget.js';
 import { prepareLocalAssignment } from '../java/locals.js';
 import { prepareReturnValue } from '../java/expressions.js';
@@ -27,8 +28,7 @@ export function renderStmts(stmts: Stmt[], rc: RenderCtx, indent: number): strin
 }
 
 export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
-  const ind = '    '.repeat(indent);
-  const line = (t: string) => ind + t;
+  const line = (t: string) => indentJava(t, indent);
   switch (s.kind) {
     case 'expr': {
       const e = s.expr;
@@ -118,8 +118,7 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
           lines.push(line(`    ${caseLabel(l, !!s.enumMode || !!s.patternMode)}`));
         if (c.hasDefault) lines.push(line('    default:'));
         if (s.scopedCases) lines.push(line('    {'));
-        if (c.body.length)
-          lines.push(...renderBlockOuter(c.body, rc, indent + (s.scopedCases ? 2 : 1)));
+        if (c.body.length) lines.push(...renderBlockOuter(c.body, rc, indent + 2));
         if (s.scopedCases) lines.push(line('    }'));
       }
       lines.push(line('}'));

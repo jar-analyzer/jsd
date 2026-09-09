@@ -1,5 +1,5 @@
 import { javaLiteral } from '../printer/literals.js';
-import { Stmt } from '../../ast/ast.js';
+import { Stmt, walkStmt } from '../../ast/ast.js';
 import { Acc, FieldInfo, MethodInfo } from '../../classfile/model.js';
 import {
   JType,
@@ -246,8 +246,16 @@ export const membersPart: ThisType<ClassGenerator> &
       return;
     }
     const mrc0 = this.methodRenderCtx(m, stmts);
+    const catchNames = new Set<string>();
+    for (const stmt of stmts)
+      walkStmt(stmt, (s) => {
+        if (s.kind === 'try')
+          for (const c of s.catches)
+            if (c.varSlot !== undefined && c.varName) catchNames.add(`${c.varSlot}:${c.varName}`);
+      });
     const lvtNames = new Map<number, Set<string>>();
     for (const lv of m.code?.localVars ?? []) {
+      if (catchNames.has(`${lv.index}:${lv.name}`)) continue;
       let names = lvtNames.get(lv.index);
       if (!names) lvtNames.set(lv.index, (names = new Set()));
       names.add(lv.name);
@@ -261,10 +269,15 @@ export const membersPart: ThisType<ClassGenerator> &
     markExternalForDecls(stmts);
     const hoisted = hoistWideScopeLocals(
       stmts,
-      (slot) =>
-        hoistable(slot)
-          ? declTypeOf(this.ctx, m, slot, stmts, mrc0.slotTypes.get(slot))
-          : undefined,
+      (slot) => {
+        const names = lvtNames.get(slot);
+        const lv = m.code?.localVars.find(
+          (entry) => entry.index === slot && names?.has(entry.name),
+        );
+        return lv
+          ? parseFieldDescriptor(lv.descriptor)
+          : declTypeOf(this.ctx, m, slot, stmts, mrc0.slotTypes.get(slot));
+      },
       hoistable,
     );
     if (hoisted.decls.length) {

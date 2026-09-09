@@ -81,38 +81,57 @@ export const ifPart: ThisType<Structurer> &
   },
 
   resolveIf(b: number, nodes: Set<number>): { condT: Expr; T: number; condE: Expr; E: number } {
-    const term = this.t(b) as { t: 'if'; cond: Expr; jumpB: number; fallB: number };
-    let condT = term.cond,
-      T = term.jumpB;
-    let condE = negate(term.cond),
-      E = term.fallB;
-    let guard = 0;
-    while (guard++ < 64) {
-      if (this.canAbsorb(E, b, nodes)) {
-        const eterm = this.t(E) as { t: 'if'; cond: Expr; jumpB: number; fallB: number };
-        if (eterm.jumpB === T) {
-          const nE = eterm.fallB;
-          this.absorbed.add(E);
-          condT = or(condT, eterm.cond);
-          condE = and(condE, negate(eterm.cond));
-          E = nE;
-          continue;
+    type Resolved = { condT: Expr; T: number; condE: Expr; E: number; absorbed: Set<number> };
+    const resolve = (block: number, depth: number): Resolved => {
+      this.ctx.budget.check(1);
+      const term = this.t(block) as { t: 'if'; cond: Expr; jumpB: number; fallB: number };
+      const result: Resolved = {
+        condT: term.cond,
+        T: term.jumpB,
+        condE: negate(term.cond),
+        E: term.fallB,
+        absorbed: new Set(),
+      };
+      if (depth >= 24) return result;
+      const candidate = (child: number): boolean => {
+        const pred = this.cfg.blocks[child]?.preds[0];
+        return (
+          pred !== undefined &&
+          (pred === block || result.absorbed.has(pred)) &&
+          !result.absorbed.has(child) &&
+          this.canAbsorb(child, pred, nodes)
+        );
+      };
+      for (let i = 0; i < 64; i++) {
+        let merged = false;
+        for (const side of ['E', 'T'] as const) {
+          const child = result[side];
+          if (!candidate(child)) continue;
+          const nested = resolve(child, depth + 1);
+          const other = side === 'E' ? result.T : result.E;
+          if (nested.T !== other && nested.E !== other) continue;
+          const joinsOnTrue = nested.T === other;
+          const cond = joinsOnTrue ? nested.condT : nested.condE;
+          if (side === 'E') {
+            result.condT = or(result.condT, cond);
+            result.condE = and(result.condE, negate(cond));
+          } else {
+            result.condE = or(result.condE, cond);
+            result.condT = and(result.condT, negate(cond));
+          }
+          result[side] = joinsOnTrue ? nested.E : nested.T;
+          result.absorbed.add(child);
+          for (const node of nested.absorbed) result.absorbed.add(node);
+          merged = true;
+          break;
         }
+        if (!merged) break;
       }
-      if (this.canAbsorb(T, b, nodes)) {
-        const tterm = this.t(T) as { t: 'if'; cond: Expr; jumpB: number; fallB: number };
-        if (tterm.jumpB === E) {
-          const nT = tterm.fallB;
-          this.absorbed.add(T);
-          condE = or(condE, tterm.cond);
-          condT = and(condT, negate(tterm.cond));
-          T = nT;
-          continue;
-        }
-      }
-      break;
-    }
-    return { condT, T, condE, E };
+      return result;
+    };
+    const result = resolve(b, 0);
+    for (const block of result.absorbed) this.absorbed.add(block);
+    return result;
   },
 
   canAbsorb(blk: number, from: number, nodes: Set<number>): boolean {

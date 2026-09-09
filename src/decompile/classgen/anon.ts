@@ -18,15 +18,15 @@ function renderInitializer(stmts: Stmt[], rc: RenderCtx, isStatic: boolean): str
       if ('label' in node && node.label) labels.add(node.label);
       if (node.kind === 'return') hasReturn = true;
     });
-  const opening = isStatic ? '    static {' : '    {';
-  if (!hasReturn) return ['', opening, ...renderStmts(body, rc, 2), '    }'];
+  const opening = isStatic ? 'static {' : '{';
+  if (!hasReturn) return ['', opening, ...renderStmts(body, rc, 1), '}'];
   let label = 'initialize';
   while (labels.has(label)) label += '$';
   for (const stmt of body)
     walkStmt(stmt, (node) => {
       if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
     });
-  return ['', opening, `        ${label}: {`, ...renderStmts(body, rc, 3), '        }', '    }'];
+  return ['', opening, `    ${label}: {`, ...renderStmts(body, rc, 2), '    }', '}'];
 }
 
 export const anonPart: ThisType<ClassGenerator> &
@@ -139,7 +139,7 @@ export const anonPart: ThisType<ClassGenerator> &
           const constant = f.access & Acc.Static && f.constantValue ? this.constValueStr(f) : null;
           lines.push(
             '',
-            `    ${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
+            `${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
           );
         }
         if (bodyInitializers.length && ctor) {

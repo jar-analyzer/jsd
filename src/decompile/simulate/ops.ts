@@ -334,7 +334,12 @@ export const opsPart: ThisType<Simulator> &
           kind: 'expr',
           expr: {
             kind: 'assign-expr',
-            target: { kind: 'field', owner: ref.owner, name: ref.name },
+            target: {
+              kind: 'field',
+              owner: ref.owner,
+              name: ref.name,
+              jtype: parseFieldDescriptor(ref.descriptor),
+            },
             expr: val,
           },
         });
@@ -343,7 +348,13 @@ export const opsPart: ThisType<Simulator> &
           kind: 'expr',
           expr: {
             kind: 'assign-expr',
-            target: { kind: 'field', owner: ref.owner, name: ref.name, target },
+            target: {
+              kind: 'field',
+              owner: ref.owner,
+              name: ref.name,
+              target,
+              jtype: parseFieldDescriptor(ref.descriptor),
+            },
             expr: val,
           },
         });
