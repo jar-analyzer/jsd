@@ -74,9 +74,9 @@ Other optional limits: `maxTotalInputBytes` (batch size), `maxClasses` (class co
 | Suite           | Coverage                                                            | CI environment                             |
 | --------------- | ------------------------------------------------------------------- | ------------------------------------------ |
 | Quality         | Formatting and types; CI also checks browser bundle consistency     | Node.js 24                                 |
-| Unit            | 292 engine and demo cases                                           | Node.js 24                                 |
-| Java round-trip | 144 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
-| Modern Java     | Up to 14 Java 9–25 cases, with and without debug information        | JDK 21, 25                                 |
+| Unit            | 309 engine and demo cases                                           | Node.js 24                                 |
+| Java round-trip | 149 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
+| Modern Java     | Up to 15 Java 9–25 cases, with and without debug information        | JDK 21, 25                                 |
 | Bytecode        | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks   | JDK 11, 17, 21, 25                         |
 | Package         | Installation, type declarations, ESM, public APIs and license       | Node.js 20, 24                             |
 | Fuzz            | 2,000 fixed-seed bytecode mutations                                 | Node.js 24, JDK 25                         |

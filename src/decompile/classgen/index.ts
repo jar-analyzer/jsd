@@ -1,3 +1,4 @@
+import { annotatedType, annotatedTypeParams } from '../type-annotations.js';
 import { formatJavaSource } from '../format/index.js';
 import { OutputLines } from '../budget.js';
 import type { AnonInfo } from '../printer/context.js';
@@ -9,7 +10,8 @@ import {
 import { Acc, ClassFile, FieldInfo, MethodInfo } from '../../classfile/model.js';
 import { JType, parseClassSignature, parseFieldDescriptor } from '../../classfile/types.js';
 import { Ctx } from '../context.js';
-import { nestedDisplay, simpleOf, typeStr, exprStr, RenderCtx } from '../printer/index.js';
+import { isAnonymousClass } from '../../classfile/names.js';
+import { simpleOf, typeStr, exprStr, RenderCtx } from '../printer/index.js';
 import {
   MethodSigInfo,
   buildMethodSig,
@@ -48,7 +50,7 @@ export function generateClass(
 export class ClassGenerator {
   out: string[];
   refs = new Set<string>();
-  nameResolver: (internal: string) => string = (n) => nestedDisplay(n);
+  nameResolver: (internal: string) => string = (n) => this.ctx.className(n);
   anonClasses = new Map<string, AnonInfo>();
   localClasses = new Map<string, { simpleName: string; dropFirstArg: boolean }>();
   isEnum = false;
@@ -72,7 +74,7 @@ export class ClassGenerator {
     const simple0 = this.cls.name.slice(
       Math.max(this.cls.name.lastIndexOf('/'), this.cls.name.lastIndexOf('$')) + 1,
     );
-    if (/^\d+$/.test(simple0)) {
+    if (isAnonymousClass(this.cls)) {
       this.ctx.diagnostics.add({
         code: 'MISSING_ENCLOSING_CLASS',
         severity: 'warning',
@@ -90,7 +92,7 @@ export class ClassGenerator {
     }
     this.nameResolver = this.buildResolver();
     this.buildAnonInfo();
-    this.nameResolver = (n) => nestedDisplay(n);
+    this.nameResolver = (n) => this.ctx.className(n);
     this.renderBody();
     const imports = this.computeImports();
     this.out = new OutputLines(this.ctx.budget);
@@ -126,10 +128,10 @@ export class ClassGenerator {
     const source = formatJavaSource(body + '\n', this.ctx.opts.javaFormat, this.ctx.budget);
     this.ctx.budget.check();
     if (this.standalone) this.ctx.budget.outputChars(source.length);
-    const simple = this.cls.name.slice(this.cls.name.lastIndexOf('/') + 1);
+    const simple = this.memberName(simpleOf(this.ctx.className(this.cls.name)));
     return {
       name: this.cls.name,
-      path: (pkg ? pkg.replace(/\./g, '/') + '/' : '') + simple.replace(/\$/g, '_') + '.java',
+      path: (pkg ? pkg.replace(/\./g, '/') + '/' : '') + simple + '.java',
       source,
       status: diagnosticStatus(this.ctx.diagnostics.snapshot()),
       diagnostics: this.ctx.diagnostics.snapshot(),
@@ -155,7 +157,7 @@ export class ClassGenerator {
   computeImports(): string[] {
     const bySimple = new Map<string, string[]>();
     for (const r of this.refs) {
-      const display = nestedDisplay(r);
+      const display = this.ctx.className(r);
       const simple = simpleOf(display);
       if (/^\d+$/.test(simple)) continue;
       if (this.ownNested.has(r)) continue;
@@ -178,7 +180,7 @@ export class ClassGenerator {
         !/[A-Z]/.test(full.slice(full.lastIndexOf('.') + 1));
       void typeIsNested;
       if (importPkg === pkg && !full.slice(pkg.length + 1).includes('.')) continue;
-      if (full === nestedDisplay(this.cls.name)) continue;
+      if (full === this.ctx.className(this.cls.name)) continue;
       imports.push(full);
       void simple;
     }
@@ -189,15 +191,15 @@ export class ClassGenerator {
   buildResolver(): (internal: string) => string {
     const bySimple = new Map<string, Set<string>>();
     for (const r of this.refs) {
-      const display = nestedDisplay(r);
+      const display = this.ctx.className(r);
       const simple = simpleOf(display);
       if (!bySimple.has(simple)) bySimple.set(simple, new Set());
       bySimple.get(simple)!.add(display);
     }
-    const selfSimple = simpleOf(nestedDisplay(this.cls.name));
+    const selfSimple = simpleOf(this.ctx.className(this.cls.name));
     void selfSimple;
     return (internal: string) => {
-      const display = nestedDisplay(internal);
+      const display = this.ctx.className(internal);
       this.refs.add(internal);
       const simple = simpleOf(display);
       if (/^\d+$/.test(simple)) return display;
@@ -207,8 +209,8 @@ export class ClassGenerator {
       const candidates = bySimple.get(simple);
       if (candidates && candidates.size > 1) return display;
 
-      if (!this.standalone && display !== nestedDisplay(this.cls.name)) return display;
-      if (display === nestedDisplay(this.cls.name)) return simple;
+      if (!this.standalone && display !== this.ctx.className(this.cls.name)) return display;
+      if (display === this.ctx.className(this.cls.name)) return simple;
       const pkg = this.cls.name.includes('/')
         ? this.cls.name.slice(0, this.cls.name.lastIndexOf('/'))
         : '';
@@ -330,7 +332,7 @@ export class ClassGenerator {
       )
     )
       mods.push('non-sealed');
-    const simple = simpleOf(nestedDisplay(this.cls.name));
+    const simple = simpleOf(this.ctx.className(this.cls.name));
     const displayName = this.memberName(simple);
 
     let header = mods.join(' ');
@@ -347,14 +349,29 @@ export class ClassGenerator {
         sig = parseClassSignature(this.cls.signature);
       } catch {}
     }
+    if (sig)
+      sig.typeParams = annotatedTypeParams(
+        sig.typeParams,
+        this.cls.typeAnnotations,
+        0x00,
+        this.ctx,
+      );
     if (sig && 'typeParams' in sig && sig.typeParams.length) {
-      header += `<${sig.typeParams.map((tp) => typeParamStr(tp, (t) => this.renderType(t))).join(', ')}>`;
+      header += `<${sig.typeParams
+        .map((tp) =>
+          typeParamStr(
+            tp,
+            (t) => this.renderType(t),
+            (ann) => annotationStr(ann, this),
+          ),
+        )
+        .join(', ')}>`;
     }
 
     if (this.isRecord) {
       const comps = this.cls.recordComponents.map((c) => {
         const t = sigType(c.signature) ?? parseFieldDescriptor(c.descriptor);
-        return `${this.renderType(t)} ${c.name}`;
+        return `${this.renderType(annotatedType(t, c.typeAnnotations, this.ctx))} ${c.name}`;
       });
       header += `(${comps.join(', ')})`;
     }
@@ -365,9 +382,16 @@ export class ClassGenerator {
       !this.isRecord &&
       !this.isInterface &&
       superName &&
-      superName !== 'java/lang/Object'
+      (superName !== 'java/lang/Object' ||
+        this.cls.typeAnnotations?.some((a) => a.targetType === 0x10 && a.index === 65535))
     ) {
-      header += ` extends ${sig ? this.renderType(sig.superType) : this.resolve(superName)}`;
+      header += ` extends ${this.renderType(
+        annotatedType(
+          sig?.superType ?? { kind: 'class', name: superName },
+          this.cls.typeAnnotations?.filter((a) => a.targetType === 0x10 && a.index === 65535),
+          this.ctx,
+        ),
+      )}`;
     }
     if (this.isInterface && superName && superName !== 'java/lang/Object') {
     }
@@ -380,7 +404,15 @@ export class ClassGenerator {
         ifaces
           .map((i) => {
             const type = sig?.interfaces.find((t) => t.kind === 'class' && t.name === i);
-            return type ? this.renderType(type) : this.resolve(i);
+            return this.renderType(
+              annotatedType(
+                type ?? { kind: 'class', name: i },
+                this.cls.typeAnnotations?.filter(
+                  (a) => a.targetType === 0x10 && a.index === this.cls.interfaces.indexOf(i),
+                ),
+                this.ctx,
+              ),
+            );
           })
           .join(', ');
     }
@@ -395,8 +427,6 @@ export class ClassGenerator {
     if (local && !this.standalone) return local.simpleName;
     const ic = this.cls.innerClasses.find((x) => x.inner === this.cls.name);
     if (!this.standalone && ic?.innerName) return ic.innerName;
-    if (ic?.outer && ic.innerName && ic.innerName.includes('$'))
-      return ic.innerName.replace(/\$/g, '.');
     return ic?.innerName ?? simple;
   }
 

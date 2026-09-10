@@ -159,7 +159,10 @@ export function splitLocalSlots(cfg: CFG, method: MethodInfo): number {
   };
   for (const [ins, access] of accesses) {
     const def = access.def ?? readDefinitions.get(ins);
-    if (def !== undefined) ins.local = slotFor(def);
+    if (def !== undefined) {
+      if (code.typeAnnotations?.length) ins.originalLocal = access.slot;
+      ins.local = slotFor(def);
+    }
   }
   return nextSlot;
 }

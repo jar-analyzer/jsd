@@ -1,0 +1,7 @@
+{
+  "preserveTypeAnnotations": [
+    "TypeAnnotationPositions",
+    "TypeAnnotationPositions$Member",
+    "TypeAnnotationPositions$1"
+  ]
+}

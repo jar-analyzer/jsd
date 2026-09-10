@@ -10,7 +10,6 @@ import { BinOp, Stmt, Expr } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import type { Ctx } from '../context.js';
 import { decodeBytecode } from '../../bytecode/decode.js';
-import { nestedDisplay } from './types.js';
 import { renderStmts as renderStmtsInner } from './stmt.js';
 
 export const PREC = {
@@ -152,7 +151,7 @@ export function resolve(internal: string, rc: RenderCtx): string {
   const lc = rc.localClasses?.get(internal);
   if (lc) return lc.simpleName;
   rc.refs.add(internal);
-  return rc.nameResolver ? rc.nameResolver(internal) : nestedDisplay(internal);
+  return rc.nameResolver ? rc.nameResolver(internal) : rc.ctx.className(internal);
 }
 
 export function outerOf(rc: RenderCtx, owner: string): string | null {

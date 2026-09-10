@@ -1,3 +1,5 @@
+import { hasTypeAnnotations } from '../type-annotations.js';
+import { isAnonymousClass } from '../../classfile/names.js';
 import type { Expr } from '../../ast/ast.js';
 import { expressionType } from '../../ast/types.js';
 import type { JType } from '../../classfile/types.js';
@@ -15,6 +17,7 @@ export function anonSupertype(owner: string, ctx?: Ctx): JType | undefined {
   if (!/^\d+$/.test(simple)) return undefined;
   const cls = ctx?.lookup(owner);
   if (cls) {
+    if (!isAnonymousClass(cls)) return undefined;
     if (cls.superName && cls.superName !== 'java/lang/Object')
       return { kind: 'class', name: cls.superName };
     if (cls.interfaces.length === 1) return { kind: 'class', name: cls.interfaces[0] };
@@ -28,7 +31,13 @@ export function initialType(e: Expr, ctx?: Ctx): JType | undefined {
 
 export function declarationValue(e: Expr, t: JType): Expr {
   e = adaptLambdaTarget(e, t);
-  if (e.kind !== 'cast' || !sameType(e.jtype, t)) return e;
+  if (
+    e.kind !== 'cast' ||
+    hasTypeAnnotations(e.jtype) ||
+    e.intersectionTypes?.some(hasTypeAnnotations) ||
+    !sameType(e.jtype, t)
+  )
+    return e;
   const inner = e.expr;
   const actual = expressionType(inner);
   if (actual && sameType(actual, t)) return inner;

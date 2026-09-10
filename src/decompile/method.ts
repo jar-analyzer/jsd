@@ -1,4 +1,5 @@
 import { DecompileLimitError } from './budget.js';
+import { applyCodeTypeAnnotations } from './code-annotations.js';
 import { verifyFrames } from './verify.js';
 import { validateStackMaps } from './stackmap.js';
 import { splitLocalSlots } from './locals.js';
@@ -159,6 +160,7 @@ function decompileMethodImpl(ctx: Ctx, cls: ClassFile, method: MethodInfo): Meth
   }
   let stmts = res.stmts;
   try {
+    applyCodeTypeAnnotations(ctx, cls, method, stmts, instrs);
     stmts = applyPatterns(ctx, cls, method, stmts, sim);
   } catch (e) {
     if (e instanceof DecompileLimitError) throw e;

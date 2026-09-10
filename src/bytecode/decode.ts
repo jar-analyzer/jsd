@@ -8,6 +8,7 @@ export interface Instr {
   cpIndex?: number;
   imm?: number;
   local?: number;
+  originalLocal?: number;
   iincVal?: number;
   branch?: number;
   atype?: number;

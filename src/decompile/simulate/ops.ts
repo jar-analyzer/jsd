@@ -309,7 +309,15 @@ export const opsPart: ThisType<Simulator> &
       const to = primOf(nm[2]);
       void fromT;
       const wide = to === 'long' || to === 'double';
-      stack.push({ kind: 'cast', jtype: { kind: 'prim', name: to }, expr: v }, wide);
+      stack.push(
+        {
+          kind: 'cast',
+          jtype: { kind: 'prim', name: to },
+          expr: v,
+          ...(this.method.code?.typeAnnotations?.length ? { bytecodeOffset: ins.pc } : {}),
+        },
+        wide,
+      );
       return;
     }
     if (nm === 'getstatic' || nm === 'getfield') {
@@ -443,7 +451,12 @@ export const opsPart: ThisType<Simulator> &
               args[i] = value;
             }
           }
-          const newExpr = this.buildNew(target.owner, args, ref.descriptor);
+          let newExpr = this.buildNew(target.owner, args, ref.descriptor);
+          if (this.method.code?.typeAnnotations?.length) {
+            if (newExpr.kind !== 'new')
+              newExpr = { kind: 'new', owner: target.owner, args, descriptor: ref.descriptor };
+            newExpr.bytecodeOffset = target.uid;
+          }
           this.replaceUninit(stack, stmts, target.uid, newExpr);
           if (returns) stack.push(newExpr);
           return;
@@ -617,13 +630,23 @@ export const opsPart: ThisType<Simulator> &
     if (nm === 'checkcast') {
       const t = this.classTypeAt(ins.cpIndex!);
       const v = stack.pop();
-      stack.push({ kind: 'cast', jtype: t, expr: v });
+      stack.push({
+        kind: 'cast',
+        jtype: t,
+        expr: v,
+        ...(this.method.code?.typeAnnotations?.length ? { bytecodeOffset: ins.pc } : {}),
+      });
       return;
     }
     if (nm === 'instanceof') {
       const t = this.classTypeAt(ins.cpIndex!);
       const v = stack.pop();
-      stack.push({ kind: 'instanceof', expr: v, checkType: t });
+      stack.push({
+        kind: 'instanceof',
+        expr: v,
+        checkType: t,
+        ...(this.method.code?.typeAnnotations?.length ? { bytecodeOffset: ins.pc } : {}),
+      });
       return;
     }
     if (nm === 'monitorenter' || nm === 'monitorexit') {
@@ -750,7 +773,12 @@ export const opsPart: ThisType<Simulator> &
     const jtype = this.ctx.slotTypeGeneric(this.method, slot, pc);
     return {
       kind: 'expr',
-      expr: { kind: 'assign-expr', target: { kind: 'local', slot, name, jtype }, expr: v },
+      expr: {
+        kind: 'assign-expr',
+        target: { kind: 'local', slot, name, jtype },
+        expr: v,
+        ...(this.method.code?.typeAnnotations?.length ? { bytecodeOffset: pc } : {}),
+      },
     };
   },
 

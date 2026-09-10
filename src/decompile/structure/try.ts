@@ -116,6 +116,7 @@ export const tryPart: ThisType<Structurer> &
         body: Stmt[];
         varName?: string;
         varSlot?: number;
+        handlerPc?: number;
       }[] = [];
       for (const h of group.handlers) {
         if (group.consumedHandlers.has(h.handlerPc) || h.catchType === null) continue;
@@ -137,7 +138,13 @@ export const tryPart: ThisType<Structurer> &
         }
         const handlerSet = this.handlerOwned(hb, nodes);
         const hBody = this.walk(hb, handlerSet, new Set([...tryFollow]), wctx);
-        syncCatches.push({ type: h.catchType, body: hBody, varName, varSlot });
+        syncCatches.push({
+          type: h.catchType,
+          body: hBody,
+          varName,
+          varSlot,
+          handlerPc: h.handlerPc,
+        });
       }
       if (syncCatches.length) body = [{ kind: 'try', body, catches: syncCatches }];
       this.consumeGroup(group, nodes);
@@ -182,6 +189,7 @@ export const tryPart: ThisType<Structurer> &
       body: Stmt[];
       varName?: string;
       varSlot?: number;
+      handlerPc?: number;
       extraTypes?: string[];
     }[] = [];
     const seenHandlerPc = new Set<number>();
@@ -219,7 +227,14 @@ export const tryPart: ThisType<Structurer> &
       }
       const handlerSet = this.handlerOwned(hb, nodes);
       const hBody = this.walk(hb, handlerSet, new Set([...tryFollow]), wctx);
-      catches.push({ type: h.catchType, body: hBody, varName, varSlot, extraTypes: [] });
+      catches.push({
+        type: h.catchType,
+        body: hBody,
+        varName,
+        varSlot,
+        extraTypes: [],
+        handlerPc: h.handlerPc,
+      });
     }
 
     if (matchGuard) {

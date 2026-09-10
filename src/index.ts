@@ -2,6 +2,7 @@ export type { JavaFormatOptions } from './decompile/format/index.js';
 import { WorkBudget, DecompileLimitError } from './decompile/budget.js';
 export { DecompileLimitError } from './decompile/budget.js';
 import { parseClass } from './classfile/parser.js';
+import { enclosingClass, isAnonymousClass } from './classfile/names.js';
 import type { ClassFile } from './classfile/model.js';
 import { Ctx, DecompileOptions } from './decompile/context.js';
 import { generateClass, ClassSource } from './decompile/classgen/index.js';
@@ -40,6 +41,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
   const classes = new Map<string, ClassFile>();
   const inputClasses = new Map<string, ClassFile>();
   const loadErrors = new Map<string, DecompileDiagnostic>();
+  const loadWarnings = new Map<string, DecompileDiagnostic>();
   const inputSizes = new Map<ClassFile, number>();
   let totalInputBytes = 0;
   let lastDiagnostics: DecompileDiagnostic[] = [];
@@ -51,7 +53,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
     totalInputBytes -= inputSizes.get(cf) ?? 0;
     inputSizes.delete(cf);
   };
-  const load = (data: Uint8Array): ClassFile => {
+  const load = (data: Uint8Array, inputName?: string): ClassFile => {
     const budget = new WorkBudget(options);
     budget.input(data.byteLength);
     const cf = parseClass(data, (name) => {
@@ -62,6 +64,17 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       );
     });
     const previous = classes.get(cf.name);
+    if (previous) {
+      const previousInput = [...inputClasses].find(([, input]) => input === previous)?.[0];
+      loadWarnings.set(cf.name, {
+        code: 'DUPLICATE_CLASS',
+        severity: 'warning',
+        stage: 'parse',
+        className: cf.name,
+        inputName,
+        message: `Duplicate class ${cf.name}: ${inputName ?? 'addClass input'} replaces ${previousInput ?? 'a previously loaded class'}`,
+      });
+    }
     if (previous) remove(previous);
     classes.set(cf.name, cf);
     inputSizes.set(cf, data.byteLength);
@@ -74,6 +87,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
     const out: ClassSource[] = [];
     const allDiagnostics = new DiagnosticBag();
     for (const diagnostic of loadErrors.values()) allDiagnostics.add(diagnostic);
+    for (const diagnostic of loadWarnings.values()) allDiagnostics.add(diagnostic);
     const children = new Map<string, ClassFile[]>();
     const topLevel: ClassFile[] = [];
     for (const cls of classes.values()) {
@@ -87,14 +101,9 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
         });
         continue;
       }
-      const ic = cls.innerClasses.find((x) => x.inner === cls.name);
-      const outer = ic?.outer ?? undefined;
-      const simple = cls.name.slice(
-        Math.max(cls.name.lastIndexOf('/'), cls.name.lastIndexOf('$')) + 1,
-      );
-      if (/^\d+$/.test(simple)) {
-        const enclosing = cls.enclosing?.class ?? cls.name.slice(0, cls.name.lastIndexOf('$'));
-        if (!classes.has(enclosing))
+      const enclosing = enclosingClass(cls);
+      if (isAnonymousClass(cls)) {
+        if (!enclosing || !classes.has(enclosing))
           allDiagnostics.add({
             code: 'MISSING_ENCLOSING_CLASS',
             severity: 'warning',
@@ -104,9 +113,6 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
           });
         continue;
       }
-      const enclosing = /^\d+[A-Za-z]/.test(simple)
-        ? (cls.enclosing?.class ?? cls.name.slice(0, cls.name.lastIndexOf('$')))
-        : outer;
       if (enclosing && classes.has(enclosing)) {
         let list = children.get(enclosing);
         if (!list) children.set(enclosing, (list = []));
@@ -189,11 +195,14 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
       lastDiagnostics = [];
       for (const [name, data] of map) {
         const previous = inputClasses.get(name);
-        if (previous) remove(previous);
+        if (previous) {
+          remove(previous);
+          loadWarnings.delete(previous.name);
+        }
         inputClasses.delete(name);
         loadErrors.delete(name);
         try {
-          const cf = load(data);
+          const cf = load(data, name);
           inputClasses.set(name, cf);
         } catch (error) {
           loadErrors.set(name, {
@@ -211,6 +220,7 @@ export function createDecompiler(options: DecompileOptions = {}): Decompiler {
     getDiagnostics: () => {
       const diagnostics = new DiagnosticBag();
       for (const diagnostic of loadErrors.values()) diagnostics.add(diagnostic);
+      for (const diagnostic of loadWarnings.values()) diagnostics.add(diagnostic);
       for (const diagnostic of lastDiagnostics) diagnostics.add(diagnostic);
       return diagnostics.snapshot();
     },

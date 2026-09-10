@@ -1,3 +1,4 @@
+import { hasTypeAnnotations } from '../type-annotations.js';
 import { walkStmt, walkStmtExprs, type Expr, type Stmt } from '../../ast/ast.js';
 import { transformChildren } from './hoist.js';
 import { localUses } from './local-uses.js';
@@ -34,6 +35,7 @@ export function removeUnusedLocals(stmts: Stmt[]): Stmt[] {
         s.expr.kind === 'assign-expr' &&
         !s.expr.op &&
         s.expr.target.kind === 'local' &&
+        !(s.expr.target.jtype && hasTypeAnnotations(s.expr.target.jtype)) &&
         !uses.get(s.expr.target.slot)?.reads &&
         discardable(s.expr.expr)
       ) {

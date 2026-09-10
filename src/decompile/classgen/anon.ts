@@ -1,3 +1,6 @@
+import { annotatedType, declarationAnnotations } from '../type-annotations.js';
+import { annotationStr } from './annotations.js';
+import { enclosingClass, isAnonymousClass } from '../../classfile/names.js';
 import { DecompileLimitError } from '../budget.js';
 import { errorMessage } from '../diagnostics.js';
 import { Acc, ClassFile, MethodInfo } from '../../classfile/model.js';
@@ -6,7 +9,7 @@ import { Expr, Stmt, walkStmt } from '../../ast/ast.js';
 import { resolveLambda } from '../lambdas.js';
 import { decompileMethod } from '../method.js';
 import { RenderCtx, renderStmts, renderStmtsHeader, typeStr } from '../printer/index.js';
-import { buildMethodSig, ctorHasOuterParam, safeSig } from './methodsig.js';
+import { buildMethodSig, ctorHasOuterParam, safeSig, typeParamStr } from './methodsig.js';
 import type { ClassGenerator } from './index.js';
 
 function renderInitializer(stmts: Stmt[], rc: RenderCtx, isStatic: boolean): string[] {
@@ -34,10 +37,7 @@ export const anonPart: ThisType<ClassGenerator> &
   buildAnonInfo(): void {
     const enclosing = this.cls.name;
     for (const [name, cf] of this.ctx.classes) {
-      const simple = name.slice(Math.max(name.lastIndexOf('/'), name.lastIndexOf('$')) + 1);
-      if (!/^\d+$/.test(simple)) continue;
-      const enclosingAttr = cf.enclosing?.class;
-      if (enclosingAttr !== enclosing && !name.startsWith(enclosing + '$')) continue;
+      if (!isAnonymousClass(cf) || enclosingClass(cf) !== enclosing) continue;
       let superInternal = cf.interfaces[0] ?? cf.superName ?? 'java/lang/Object';
       if (superInternal === 'java/lang/Object' && cf.interfaces.length > 0)
         superInternal = cf.interfaces[0];
@@ -138,8 +138,13 @@ export const anonPart: ThisType<ClassGenerator> &
             .join(' ');
           const constant = f.access & Acc.Static && f.constantValue ? this.constValueStr(f) : null;
           lines.push(
+            ...declarationAnnotations(f.annotations, f.typeAnnotations, 0x13).map((ann) =>
+              annotationStr(ann, this),
+            ),
+          );
+          lines.push(
             '',
-            `${prefix ? prefix + ' ' : ''}${typeStr(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
+            `${prefix ? prefix + ' ' : ''}${typeStr(annotatedType(t && 'kind' in t ? t : parseFieldDescriptor(f.descriptor), f.typeAnnotations, this.ctx), this.renderCtxForTypes())} ${f.name}${constant !== null ? ' = ' + constant : ''};`,
           );
         }
         if (bodyInitializers.length && ctor) {
@@ -169,7 +174,12 @@ export const anonPart: ThisType<ClassGenerator> &
           mrc.scopes.push(new Map());
           try {
             const header = this.methodHeaderFor(cf, mm, mrc);
-            lines.push('');
+            lines.push(
+              '',
+              ...declarationAnnotations(mm.annotations, mm.typeAnnotations, 0x14).map((ann) =>
+                annotationStr(ann, this),
+              ),
+            );
             if (header) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
           } catch (e) {
             if (e instanceof DecompileLimitError) throw e;
@@ -195,12 +205,9 @@ export const anonPart: ThisType<ClassGenerator> &
       });
     }
     for (const [name, cf] of this.ctx.classes) {
-      const dollar = name.lastIndexOf('$');
-      if (dollar <= name.lastIndexOf('/')) continue;
-      const simple = name.slice(dollar + 1);
-      if (!/^\d+[A-Za-z]/.test(simple)) continue;
-      if (!name.startsWith(enclosing + '$')) continue;
-      const innerName = simple.replace(/^\d+/, '');
+      const inner = cf.innerClasses.find((entry) => entry.inner === name);
+      if (!cf.enclosing || cf.enclosing.class !== enclosing || !inner?.innerName) continue;
+      const innerName = inner.innerName;
       const lctor = cf.methods.find((mm) => mm.name === '<init>');
       const hasOuterRef = lctor
         ? ctorHasOuterParam(cf, lctor)
@@ -253,9 +260,30 @@ export const anonPart: ThisType<ClassGenerator> &
     )
       mods.push('default');
     let header = mods.join(' ');
+    if (sig.typeParams.length)
+      header += `${header ? ' ' : ''}<${sig.typeParams
+        .map((param) =>
+          typeParamStr(
+            param,
+            (type) => typeStr(type, rc),
+            (ann) => annotationStr(ann, this),
+          ),
+        )
+        .join(', ')}>`;
     const ret = sig.ret;
     header += `${header ? ' ' : ''}${typeStr(ret, rc)} ${mm.name}`;
-    header += `(${sig.params.map((p) => `${typeStr(p.type, rc)}${p.varargs ? '...' : ''} ${p.name}`).join(', ')})`;
+    header += `(${sig.receiver ? `${typeStr(sig.receiver, rc)} ${sig.receiverName}${sig.params.length ? ', ' : ''}` : ''}${sig.params
+      .map((p, i) => {
+        const annotations = declarationAnnotations(
+          mm.paramAnnotations[i] ?? [],
+          mm.typeAnnotations?.filter((ann) => ann.index === i),
+          0x16,
+        )
+          .map((ann) => annotationStr(ann, this))
+          .join(' ');
+        return `${annotations ? annotations + ' ' : ''}${p.varargs ? typeStr(p.type, rc).replace(/\[\]$/, '...') : typeStr(p.type, rc)} ${p.name}`;
+      })
+      .join(', ')})`;
     if (sig.thrown.length) header += ` throws ${sig.thrown.map((t) => typeStr(t, rc)).join(', ')}`;
     return header;
   },

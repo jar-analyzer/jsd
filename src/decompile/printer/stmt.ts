@@ -151,7 +151,9 @@ export function renderStmt(s: Stmt, rc: RenderCtx, indent: number): string[] {
         const extras = (c as { extraTypes?: string[] }).extraTypes ?? [];
         const all = [c.type, ...extras].filter((t): t is string => !!t);
         const type = all.length
-          ? all.map((t) => typeStr({ kind: 'class', name: t }, rc)).join(' | ')
+          ? all
+              .map((t, i) => typeStr(c.annotatedTypes?.[i] ?? { kind: 'class', name: t }, rc))
+              .join(' | ')
           : 'Exception';
         const varN = c.varName ?? 'e';
         lines.push(line(`} catch (${type} ${varN}) {`));

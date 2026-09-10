@@ -15,6 +15,7 @@ import {
   LocalVarEntry,
   MethodInfo,
   RecordComponent,
+  TypeAnnotation,
 } from './model.js';
 
 interface RawAttr {
@@ -103,10 +104,13 @@ function parseCode(a: RawAttr, cp: ConstantPool): CodeAttr {
   const lineNumbers: { startPc: number; line: number }[] = [];
   const localVars: LocalVarEntry[] = [];
   const localVarTypes: LocalVarEntry[] = [];
+  const typeAnnotations: TypeAnnotation[] = [];
   let stackMapFrames: CodeAttr['stackMapFrames'];
   for (const at of readAttrs(rd, cp)) {
     const d = new ByteReader(at.data);
-    if (at.name === 'StackMapTable') {
+    if (isTypeAnnotations(at)) {
+      typeAnnotations.push(...readTypeAnnotations(at, cp, 'code'));
+    } else if (at.name === 'StackMapTable') {
       if (stackMapFrames) throw new Error('Duplicate StackMapTable');
       stackMapFrames = parseStackMap(at.data, cp);
     } else if (at.name === 'LineNumberTable') {
@@ -145,6 +149,7 @@ function parseCode(a: RawAttr, cp: ConstantPool): CodeAttr {
     localVars,
     localVarTypes,
     stackMapFrames,
+    typeAnnotations,
   };
 }
 
@@ -209,7 +214,6 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
     unknownAttrs: [],
     cp,
   };
-
   const fCount = r.u2();
   for (let i = 0; i < fCount; i++) {
     const fAccess = r.u2();
@@ -225,6 +229,8 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
       deprecated: false,
     };
     for (const at of readAttrs(r, cp)) {
+      if (isTypeAnnotations(at))
+        (f.typeAnnotations ??= []).push(...readTypeAnnotations(at, cp, 'field'));
       const d = new ByteReader(at.data);
       switch (at.name) {
         case 'ConstantValue': {
@@ -267,6 +273,8 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
       deprecated: false,
     };
     for (const at of readAttrs(r, cp)) {
+      if (isTypeAnnotations(at))
+        (m.typeAnnotations ??= []).push(...readTypeAnnotations(at, cp, 'method'));
       const d = new ByteReader(at.data);
       switch (at.name) {
         case 'Code':
@@ -321,6 +329,10 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
   }
 
   for (const at of readAttrs(r, cp)) {
+    if (isTypeAnnotations(at)) {
+      (cls.typeAnnotations ??= []).push(...readTypeAnnotations(at, cp, 'class'));
+      continue;
+    }
     const d = new ByteReader(at.data);
     switch (at.name) {
       case 'SourceFile':
@@ -376,6 +388,8 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
           const cDesc = cp.utf8(d.u2());
           const comp: RecordComponent = { name: cName, descriptor: cDesc, annotations: [] };
           for (const cat of readAttrs(d, cp)) {
+            if (isTypeAnnotations(cat))
+              (comp.typeAnnotations ??= []).push(...readTypeAnnotations(cat, cp, 'field'));
             const cd = new ByteReader(cat.data);
             if (cat.name === 'Signature') comp.signature = cp.utf8(cd.u2());
             else if (
@@ -422,4 +436,60 @@ function readAnnotations(d: ByteReader, cp: ConstantPool): Ann[] {
   const out: Ann[] = [];
   for (let i = 0; i < n; i++) out.push(parseAnnotation(d, cp));
   return out;
+}
+
+function isTypeAnnotations(attr: RawAttr): boolean {
+  return (
+    attr.name === 'RuntimeVisibleTypeAnnotations' || attr.name === 'RuntimeInvisibleTypeAnnotations'
+  );
+}
+
+function readTypeAnnotations(
+  attr: RawAttr,
+  cp: ConstantPool,
+  location: 'class' | 'field' | 'method' | 'code',
+): TypeAnnotation[] {
+  const rd = new ByteReader(attr.data);
+  const count = rd.u2();
+  const result: TypeAnnotation[] = [];
+  const allowed = {
+    class: [0x00, 0x10, 0x11],
+    field: [0x13],
+    method: [0x01, 0x12, 0x14, 0x15, 0x16, 0x17],
+    code: [0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b],
+  };
+  for (let i = 0; i < count; i++) {
+    const targetType = rd.u1();
+    if (!allowed[location].includes(targetType))
+      throw new Error(`Invalid type annotation target ${targetType} on ${location}`);
+    const entry: Omit<TypeAnnotation, 'annotation'> = {
+      targetType,
+      path: [],
+      visible: attr.name === 'RuntimeVisibleTypeAnnotations',
+    };
+    if ([0x00, 0x01, 0x16].includes(targetType)) entry.index = rd.u1();
+    else if ([0x10, 0x17, 0x42].includes(targetType)) entry.index = rd.u2();
+    else if ([0x11, 0x12].includes(targetType)) {
+      entry.index = rd.u1();
+      entry.boundIndex = rd.u1();
+    } else if (targetType === 0x40 || targetType === 0x41) {
+      entry.table = [];
+      const ranges = rd.u2();
+      for (let j = 0; j < ranges; j++)
+        entry.table.push({ start: rd.u2(), length: rd.u2(), index: rd.u2() });
+    } else if (targetType >= 0x43) {
+      entry.offset = rd.u2();
+      if (targetType >= 0x47) entry.typeArgumentIndex = rd.u1();
+    }
+    const length = rd.u1();
+    for (let j = 0; j < length; j++) {
+      const kind = rd.u1(),
+        index = rd.u1();
+      if (kind > 3 || (kind !== 3 && index !== 0)) throw new Error('Invalid type annotation path');
+      entry.path.push({ kind, index });
+    }
+    result.push({ ...entry, annotation: parseAnnotation(rd, cp) });
+  }
+  if (rd.remaining) throw new Error('Trailing type annotation bytes');
+  return result;
 }

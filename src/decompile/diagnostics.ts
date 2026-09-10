@@ -2,6 +2,8 @@ export type DecompileStatus = 'success' | 'partial' | 'failed';
 export type DiagnosticStage =
   'parse' | 'decode' | 'cfg' | 'simulate' | 'structure' | 'transform' | 'render' | 'decompile';
 export type DiagnosticCode =
+  | 'DUPLICATE_CLASS'
+  | 'UNSUPPORTED_TYPE_ANNOTATIONS'
   | 'RESOURCE_LIMIT'
   | 'DECOMPILE_CANCELLED'
   | 'CLASS_PARSE_FAILED'

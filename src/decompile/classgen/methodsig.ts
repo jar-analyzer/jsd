@@ -1,9 +1,13 @@
+import { annotatedType, annotatedTypeParams } from '../type-annotations.js';
+import type { Ann } from '../../classfile/model.js';
+import type { TypeParam } from '../../classfile/types.js';
 import { isAssertionFlag } from '../patterns/asserts.js';
 import { Stmt } from '../../ast/ast.js';
 import { Acc, ClassFile, FieldInfo, MethodInfo } from '../../classfile/model.js';
 import {
   JType,
   MethodSig,
+  parseClassSignature,
   parseFieldDescriptor,
   parseMethodDescriptor,
   parseSignature,
@@ -11,7 +15,10 @@ import {
 import { Ctx, JAVA_KEYWORDS } from '../context.js';
 
 export interface MethodSigInfo {
-  typeParams: { name: string; classBound: JType | null; ifaceBounds: JType[] }[];
+  typeParams: TypeParam[];
+  receiver?: JType;
+  receiverName?: string;
+  constructorAnnotations?: Ann[];
   params: { name: string; type: JType; varargs?: boolean }[];
   ret: JType;
   thrown: JType[];
@@ -114,8 +121,62 @@ export function buildMethodSig(ctx: Ctx, cls: ClassFile, m: MethodInfo): MethodS
     }
     names.push(safeIdent(nm, `arg${i}`));
   }
+  const annotations = m.typeAnnotations ?? [];
+  ret = annotatedType(
+    ret,
+    annotations.filter((a) => a.targetType === 0x14 && m.name !== '<init>'),
+    ctx,
+  );
+  params = params.map((type, i) =>
+    annotatedType(
+      type,
+      annotations.filter((a) => a.targetType === 0x16 && a.index === i),
+      ctx,
+    ),
+  );
+  thrown = thrown.map((type, i) =>
+    annotatedType(
+      type,
+      annotations.filter((a) => a.targetType === 0x17 && a.index === i),
+      ctx,
+    ),
+  );
+  typeParams = annotatedTypeParams(typeParams, annotations, 0x01, ctx);
+  const receiverAnnotations = annotations.filter((a) => a.targetType === 0x15);
+  const receiverOwner = m.name === '<init>' ? outerRefName(cls) : cls.name;
+  const receiverTypeOf = (name: string, seen = new Set<string>()): JType => {
+    if (seen.has(name)) throw new Error('Cyclic receiver type');
+    seen.add(name);
+    const receiverClass = ctx.lookup(name);
+    const type: JType = { kind: 'class', name };
+    if (receiverClass?.signature) {
+      const parameters = parseClassSignature(receiverClass.signature).typeParams;
+      if (parameters.length)
+        type.args = parameters.map((param) => ({ kind: 'typevar', name: param.name }));
+    }
+    const inner = ctx.innerClass(name);
+    if (inner?.outer && !(inner.access & 8)) type.owner = receiverTypeOf(inner.outer, seen);
+    return type;
+  };
+  const receiverType: JType = receiverAnnotations.length
+    ? receiverTypeOf(receiverOwner ?? cls.name)
+    : { kind: 'class', name: cls.name };
   return {
     typeParams,
+    receiver: receiverAnnotations.length
+      ? annotatedType(receiverType, receiverAnnotations, ctx)
+      : undefined,
+    receiverName:
+      m.name === '<init>'
+        ? `${ctx
+            .className(receiverOwner ?? cls.name)
+            .split('.')
+            .pop()}.this`
+        : 'this',
+    constructorAnnotations:
+      m.name === '<init>'
+        ? annotations.filter((a) => a.targetType === 0x14).map((a) => a.annotation)
+        : undefined,
     params: params.map((t, i) => ({
       name: names[i],
       type: t,
@@ -148,18 +209,22 @@ export function sigType(sig: string | undefined): JType | null {
 }
 
 export function typeParamStr(
-  tp: { name: string; classBound: JType | null; ifaceBounds: JType[] },
+  tp: TypeParam,
   rt: (t: JType) => string,
+  renderAnnotation: (ann: Ann) => string = () => '',
 ): string {
   const bounds: string[] = [];
   if (
     tp.classBound &&
-    !(tp.classBound.kind === 'class' && tp.classBound.name === 'java/lang/Object')
+    (!(tp.classBound.kind === 'class' && tp.classBound.name === 'java/lang/Object') ||
+      tp.classBound.annotations?.length)
   ) {
     bounds.push(rt(tp.classBound));
   }
   bounds.push(...tp.ifaceBounds.map(rt));
-  return bounds.length ? `${tp.name} extends ${bounds.join(' & ')}` : tp.name;
+  const annotations = tp.annotations?.map(renderAnnotation).filter(Boolean).join(' ');
+  const name = `${annotations ? annotations + ' ' : ''}${tp.name}`;
+  return bounds.length ? `${name} extends ${bounds.join(' & ')}` : name;
 }
 
 export function isSyntheticField(f: FieldInfo, cls?: ClassFile): boolean {

@@ -1,3 +1,4 @@
+import { annotatedType, declarationAnnotations } from '../type-annotations.js';
 import { javaLiteral } from '../printer/literals.js';
 import { Stmt, walkStmt } from '../../ast/ast.js';
 import { Acc, FieldInfo, MethodInfo } from '../../classfile/model.js';
@@ -14,7 +15,7 @@ import {
   markExternalForDecls,
   firstReadExpectsBoolean,
 } from '../patterns/index.js';
-import { RenderCtx, renderStmts, typeStr, nestedDisplay, simpleOf } from '../printer/index.js';
+import { RenderCtx, renderStmts, typeStr, simpleOf } from '../printer/index.js';
 import { annotationStr, annValStr } from './annotations.js';
 import {
   buildMethodSig,
@@ -132,7 +133,8 @@ export const membersPart: ThisType<ClassGenerator> &
         t = { kind: 'class', name: 'java/lang/Object' };
       }
     }
-    for (const ann of f.annotations) {
+    t = annotatedType(t, f.typeAnnotations, this.ctx);
+    for (const ann of declarationAnnotations(f.annotations, f.typeAnnotations, 0x13)) {
       const s = annotationStr(ann, this);
       if (s) this.out.push('    ' + s);
     }
@@ -203,7 +205,7 @@ export const membersPart: ThisType<ClassGenerator> &
     }
     const sig = this.methodSignature(m);
     const paramRc = this.methodRenderCtx(m);
-    for (const ann of m.annotations) {
+    for (const ann of declarationAnnotations(m.annotations, m.typeAnnotations, 0x14)) {
       const s = annotationStr(ann, this);
       if (s) this.out.push('    ' + s);
     }
@@ -411,31 +413,39 @@ export const membersPart: ThisType<ClassGenerator> &
       }
     }
     let header = mods.join(' ');
+    const constructorAnnotations = sig.constructorAnnotations
+      ?.map((ann) => annotationStr(ann, this))
+      .join(' ');
+    if (constructorAnnotations) header += `${header ? ' ' : ''}${constructorAnnotations}`;
     if (sig.typeParams.length) {
-      header += `${header ? ' ' : ''}<${sig.typeParams.map((tp) => typeParamStr(tp, (t) => typeStr(t, rc))).join(', ')}>`;
+      header += `${header ? ' ' : ''}<${sig.typeParams
+        .map((tp) =>
+          typeParamStr(
+            tp,
+            (t) => typeStr(t, rc),
+            (ann) => annotationStr(ann, this),
+          ),
+        )
+        .join(', ')}>`;
     }
     if (isCtor) {
-      const local = this.localClasses.get(this.cls.name);
-      const ic = this.cls.innerClasses.find((x) => x.inner === this.cls.name);
-      const ctorName = !this.standalone
-        ? (local?.simpleName ??
-          ic?.innerName ??
-          simpleOf(nestedDisplay(this.cls.name)).replace(/\$/g, '.'))
-        : simpleOf(nestedDisplay(this.cls.name)).replace(/\$/g, '.');
+      const ctorName = this.memberName(simpleOf(this.ctx.className(this.cls.name)));
       header += `${header ? ' ' : ''}${ctorName}`;
     } else {
       const ret = sig.ret;
       header += `${header ? ' ' : ''}${typeStr(ret, rc)} ${m.name}`;
     }
     const params = sig.params;
-    header += `(${params
+    header += `(${sig.receiver ? `${typeStr(sig.receiver, rc)} ${sig.receiverName}${params.length ? ', ' : ''}` : ''}${params
       .map((p, i) => {
-        const t = p.varargs && p.type.kind === 'array' ? p.type.elem : p.type;
+        const t = p.type;
         const annotationOffset = Math.max(0, m.paramAnnotations.length - params.length);
-        const annotations = (m.paramAnnotations[i + annotationOffset] ?? []).map((a) =>
-          annotationStr(a, this),
-        );
-        return `${annotations.length ? annotations.join(' ') + ' ' : ''}${typeStr(t, rc)}${p.varargs ? '...' : ''} ${p.name}`;
+        const annotations = declarationAnnotations(
+          m.paramAnnotations[i + annotationOffset] ?? [],
+          m.typeAnnotations?.filter((entry) => entry.index === i),
+          0x16,
+        ).map((a) => annotationStr(a, this));
+        return `${annotations.length ? annotations.join(' ') + ' ' : ''}${p.varargs ? typeStr(t, rc).replace(/\[\]$/, '...') : typeStr(t, rc)} ${p.name}`;
       })
       .join(', ')})`;
     if (sig.thrown.length) {

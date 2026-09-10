@@ -1,6 +1,6 @@
 import type { JType } from '../classfile/types.js';
 
-export type Expr =
+export type Expr = (
   | { kind: 'local'; slot: number; name: string; jtype?: JType; temporary?: boolean }
   | { kind: 'this' }
   | { kind: 'super' }
@@ -68,7 +68,13 @@ export type Expr =
   | { kind: 'monitor'; expr: Expr }
   | { kind: 'new-uninit'; owner: string; uid: number }
   | { kind: 'sb-chain'; parts: Expr[]; jtype?: JType }
-  | { kind: 'raw'; text: string; jtype?: JType };
+  | { kind: 'raw'; text: string; jtype?: JType }
+) & {
+  bytecodeOffset?: number;
+  annotatedType?: JType;
+  typeArguments?: JType[];
+  intersectionTypes?: JType[];
+};
 
 export type ConstKind =
   | 'char'
@@ -147,6 +153,8 @@ export type Stmt =
       catches: {
         type: string | null;
         typeName?: string;
+        handlerPc?: number;
+        annotatedTypes?: JType[];
         varName?: string;
         varSlot?: number;
         body: Stmt[];

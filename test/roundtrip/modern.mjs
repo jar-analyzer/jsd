@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import {
   assertGeneratedSources,
   checkExpectations,
+  checkTypeAnnotations,
   findMain,
 } from '../support/roundtrip-checks.mjs';
 
@@ -182,6 +183,7 @@ function runOne(fx, name, release) {
   const r2 = java(join(work, 'rt'), mainCls);
   if (r2.code !== 0) return { ok: false, why: 'decompiled run failed', detail: r2.out, sources };
   checkExpectations(fixturesDir, name, join(work, 'rt'), r2.out, parseClass);
+  checkTypeAnnotations(fixturesDir, name, join(work, 'orig'), join(work, 'rt'), parseClass);
   if (r1.out !== r2.out) {
     return {
       ok: false,

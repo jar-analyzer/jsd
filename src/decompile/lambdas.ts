@@ -1,7 +1,13 @@
+import { annotatedType } from './type-annotations.js';
 import { uniqueName } from './printer/context.js';
 import { Expr, Stmt } from '../ast/ast.js';
 import type { ClassFile, MemberRef, MethodHandleRef, MethodInfo } from '../classfile/model.js';
-import { parseMethodDescriptor } from '../classfile/types.js';
+import {
+  parseClassSignature,
+  parseMethodDescriptor,
+  parseSignature,
+  type JType,
+} from '../classfile/types.js';
 import type { Ctx } from './context.js';
 import { decompileMethod } from './method.js';
 import { RenderCtx, exprStr, typeStr } from './printer/index.js';
@@ -55,6 +61,12 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
   ) {
     if (e.erasedLambda && bm.args[0]?.kind === 'methodType') {
       const instantiated = bm.args[2];
+      if ((e.annotatedType || e.typeArguments?.length) && instantiated?.kind === 'methodType') {
+        const target = functionalTarget(e, instantiated.descriptor, rc);
+        if (target)
+          return `(${typeStr(target, rc)}) ${methodRefStr(handle, captured, rc, samName, e)}`;
+        return fail(ref.name);
+      }
       if (instantiated?.kind === 'methodType')
         return erasedMethodReference(
           handle,
@@ -64,7 +76,7 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
           rc,
         );
     }
-    return methodRefStr(handle, captured, rc, samName);
+    return methodRefStr(handle, captured, rc, samName, e);
   }
 
   const ownerCls = rc.ctx.lookup(ref.owner);
@@ -73,6 +85,16 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
   if (!m || !m.code) return fail(ref.name);
   const body = decompileMethod(rc.ctx, ownerCls, m);
   if (!body || body.failed) return fail(ref.name);
+  if (e.erasedLambda && m.typeAnnotations?.some((entry) => entry.targetType === 0x16)) {
+    const instantiated = bm.args[2];
+    const target =
+      instantiated?.kind === 'methodType'
+        ? functionalTarget(e, instantiated.descriptor, rc)
+        : undefined;
+    if (!target) return fail(ref.name);
+    const source = resolveLambdaBody({ ...e, erasedLambda: false }, rc);
+    return source === null ? fail(ref.name) : `(${typeStr(target, rc)}) ${source}`;
+  }
 
   const implDesc = parseMethodDescriptor(ref.descriptor);
   const isStaticImpl = (m.access & 0x0008) !== 0;
@@ -130,6 +152,13 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
     }
   }
 
+  lambdaParamTypes = lambdaParamTypes.map((type, i) =>
+    annotatedType(
+      type,
+      m.typeAnnotations?.filter((entry) => entry.targetType === 0x16 && entry.index === i),
+      rc.ctx,
+    ),
+  );
   const lastS = body.stmts[body.stmts.length - 1];
   const trimmed =
     body.stmts.length && lastS.kind === 'return' && !(lastS as { expr?: unknown }).expr
@@ -166,6 +195,75 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
   }
 }
 
+function functionalTarget(
+  expr: Extract<Expr, { kind: 'invoke' }>,
+  descriptor: string,
+  rc: RenderCtx,
+): import('../classfile/types.js').JType | undefined {
+  const target = parseMethodDescriptor(expr.descriptor).ret;
+  if (target.kind !== 'class') return undefined;
+  const method = parseMethodDescriptor(descriptor);
+  const p = method.params;
+  const ret = method.ret;
+  const name = target.name;
+  const iface = rc.ctx.lookup(name);
+  if (iface) {
+    const parameters = iface.signature ? parseClassSignature(iface.signature).typeParams : [];
+    if (!parameters.length) return target;
+    const sam = iface.methods.find((method) => method.name === expr.bootstrap?.name);
+    const formal = sam?.signature ? parseSignature(sam.signature) : undefined;
+    if (formal && !('kind' in formal)) {
+      const bindings = new Map<string, JType>();
+      const bind = (type: JType, actual: JType): void => {
+        if (type.kind === 'typevar') bindings.set(type.name, actual);
+        else if (type.kind === 'array' && actual.kind === 'array') bind(type.elem, actual.elem);
+        else if (type.kind === 'class' && actual.kind === 'class')
+          type.args?.forEach((type, i) => {
+            if (actual.args?.[i]) bind(type, actual.args[i]);
+          });
+      };
+      formal.params.forEach((type, i) => {
+        if (p[i]) bind(type, p[i]);
+      });
+      bind(formal.ret, ret);
+      const args = parameters.map((parameter) => bindings.get(parameter.name));
+      if (args.every((type): type is JType => !!type)) return { ...target, args };
+    }
+  }
+  const argumentsByName: Record<string, import('../classfile/types.js').JType[]> = {
+    'java/util/function/Function': [...p, ret],
+    'java/util/function/BiFunction': [...p, ret],
+    'java/util/function/Consumer': p,
+    'java/util/function/BiConsumer': p,
+    'java/util/function/Predicate': p,
+    'java/util/function/BiPredicate': p,
+    'java/util/function/Supplier': [ret],
+    'java/util/function/UnaryOperator': [ret],
+    'java/util/function/BinaryOperator': [ret],
+    'java/util/concurrent/Callable': [ret],
+  };
+  const args = argumentsByName[name];
+  if (!args) return undefined;
+  return {
+    ...target,
+    args: args.map((type) => {
+      const boxed: Record<string, string> = {
+        boolean: 'Boolean',
+        byte: 'Byte',
+        short: 'Short',
+        char: 'Character',
+        int: 'Integer',
+        long: 'Long',
+        float: 'Float',
+        double: 'Double',
+      };
+      return type.kind === 'prim' && boxed[type.name]
+        ? { kind: 'class', name: 'java/lang/' + boxed[type.name] }
+        : type;
+    }),
+  };
+}
+
 function fallbackLambda(name?: string): string {
   return `/* ${name ?? 'lambda'} */ () -> { throw new UnsupportedOperationException("lambda decompilation failed"); }`;
 }
@@ -175,17 +273,22 @@ function methodRefStr(
   captured: Expr[],
   rc: RenderCtx,
   _samName: string,
+  expression?: Expr,
 ): string | null {
   const ref = handle.ref;
   const ownerDisplay = (internal: string): string => {
+    if (expression?.annotatedType) return typeStr(expression.annotatedType, rc);
     rc.refs.add(internal);
     return rc.nameResolver
       ? rc.nameResolver(internal)
       : internal.replace(/\//g, '.').replace(/\$/g, '.');
   };
+  const typeArgs = expression?.typeArguments?.length
+    ? `<${expression.typeArguments.map((type) => typeStr(type, rc)).join(', ')}>`
+    : '';
   switch (handle.kind) {
     case 6:
-      return `${ownerDisplay(ref.owner)}::${ref.name}`;
+      return `${ownerDisplay(ref.owner)}::${typeArgs}${ref.name}`;
     case 9:
     case 5: {
       if (
@@ -194,19 +297,19 @@ function methodRefStr(
       ) {
       }
       if (captured.length === 1 && receiverMatches(handle, captured)) {
-        return `${exprStr(captured[0], rc, 1)}::${ref.name}`;
+        return `${exprStr(captured[0], rc, 1)}::${typeArgs}${ref.name}`;
       }
-      return `${ownerDisplay(ref.owner)}::${ref.name}`;
+      return `${ownerDisplay(ref.owner)}::${typeArgs}${ref.name}`;
     }
     case 7:
       if (ref.owner === rc.className)
-        return `${exprStr(captured[0] ?? { kind: 'this' }, rc, 1)}::${ref.name}`;
-      return `${rc.ctx.lookup(ref.owner)?.access && rc.ctx.lookup(ref.owner)!.access & 0x0200 ? ownerDisplay(ref.owner) + '.' : ''}super::${ref.name}`;
+        return `${exprStr(captured[0] ?? { kind: 'this' }, rc, 1)}::${typeArgs}${ref.name}`;
+      return `${rc.ctx.lookup(ref.owner)?.access && rc.ctx.lookup(ref.owner)!.access & 0x0200 ? ownerDisplay(ref.owner) + '.' : ''}super::${typeArgs}${ref.name}`;
     case 8: {
-      return `${ownerDisplay(ref.owner)}::new`;
+      return `${ownerDisplay(ref.owner)}::${typeArgs}new`;
     }
     default:
-      return `${ownerDisplay(ref.owner)}::${ref.name}`;
+      return `${ownerDisplay(ref.owner)}::${typeArgs}${ref.name}`;
   }
 }
 

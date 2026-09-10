@@ -42,8 +42,9 @@ export function checkExpectations(fixturesDir, name, classDir, stdout, parseClas
 
 export function findMain(dir, parseClass, allowInstance = false) {
   for (const f of readdirSync(dir)) {
-    if (!f.endsWith('.class') || f.includes('$')) continue;
+    if (!f.endsWith('.class')) continue;
     const cf = parseClass(readFileSync(join(dir, f)));
+    if (cf.enclosing || cf.innerClasses.some((entry) => entry.inner === cf.name)) continue;
     if (
       cf.methods.some(
         (m) =>
@@ -56,4 +57,52 @@ export function findMain(dir, parseClass, allowInstance = false) {
     }
   }
   return null;
+}
+
+export function checkTypeAnnotations(fixturesDir, name, originalDir, recoveredDir, parseClass) {
+  const path = join(fixturesDir, `${name}.expected.json`);
+  if (!existsSync(path)) return;
+  const expected = JSON.parse(readFileSync(path, 'utf8'));
+  const annotations = (entries = [], code) =>
+    entries
+      .map((entry) => ({
+        targetType: entry.targetType,
+        index: entry.targetType === 0x42 ? code?.exceptions[entry.index]?.catchType : entry.index,
+        boundIndex: entry.boundIndex,
+        typeArgumentIndex: entry.typeArgumentIndex,
+        path: entry.path,
+        annotation: entry.annotation,
+        visible: entry.visible,
+      }))
+      .sort((a, b) =>
+        JSON.stringify(a, (_, value) =>
+          typeof value === 'bigint' ? `${value}n` : value,
+        ).localeCompare(
+          JSON.stringify(b, (_, value) => (typeof value === 'bigint' ? `${value}n` : value)),
+        ),
+      );
+  const shape = (cls) => ({
+    annotations: annotations(cls.typeAnnotations),
+    fields: cls.fields.map((field) => [field.name, annotations(field.typeAnnotations)]).sort(),
+    methods: cls.methods
+      .map((method) => [
+        method.name + method.descriptor,
+        annotations(method.typeAnnotations),
+        annotations(method.code?.typeAnnotations, method.code),
+      ])
+      .sort(),
+    components: cls.recordComponents.map((component) => [
+      component.name,
+      annotations(component.typeAnnotations),
+    ]),
+  });
+  for (const name of expected.preserveTypeAnnotations ?? []) {
+    const original = parseClass(readFileSync(join(originalDir, name + '.class')));
+    const recovered = parseClass(readFileSync(join(recoveredDir, name + '.class')));
+    assert.deepEqual(
+      shape(recovered),
+      shape(original),
+      `${name}: type annotation metadata changed`,
+    );
+  }
 }

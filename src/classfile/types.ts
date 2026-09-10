@@ -1,9 +1,12 @@
-export type JType =
+import type { Ann } from './model.js';
+
+export type JType = (
   | { kind: 'prim'; name: PrimName }
-  | { kind: 'class'; name: string; args?: JType[] }
+  | { kind: 'class'; name: string; args?: JType[]; owner?: JType }
   | { kind: 'array'; elem: JType }
   | { kind: 'typevar'; name: string }
-  | { kind: 'wildcard'; bound?: JType; superBound?: JType };
+  | { kind: 'wildcard'; bound?: JType; superBound?: JType }
+) & { annotations?: Ann[] };
 
 export type PrimName =
   'boolean' | 'byte' | 'char' | 'short' | 'int' | 'long' | 'float' | 'double' | 'void';
@@ -15,6 +18,7 @@ export interface MethodSig {
   thrown: JType[];
 }
 export interface TypeParam {
+  annotations?: Ann[];
   name: string;
   classBound: JType | null;
   ifaceBounds: JType[];
@@ -175,6 +179,7 @@ function readType(r: SigReader): JType {
 function readClassType(r: SigReader): JType {
   let name = '';
   let args: JType[] | undefined;
+  let owner: JType | undefined;
   for (;;) {
     const start = r.pos;
     while (!r.done && ![';', '<', '.'].includes(r.peek())) r.pos++;
@@ -182,10 +187,11 @@ function readClassType(r: SigReader): JType {
     name += r.s.slice(start, r.pos);
     args = r.try('<') ? readTypeArgs(r) : undefined;
     if (!r.try('.')) break;
+    owner = { kind: 'class', name, args, ...(owner ? { owner } : {}) };
     name += '$';
   }
   r.expect(';');
-  return { kind: 'class', name, args };
+  return { kind: 'class', name, args, ...(owner ? { owner } : {}) };
 }
 
 function readTypeArgs(r: SigReader): JType[] {

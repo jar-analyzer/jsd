@@ -1,3 +1,4 @@
+import { annotatedType, hasTypeAnnotations } from '../type-annotations.js';
 import { formatJavaBinary, formatJavaCall, indentJava } from './layout.js';
 import { prepareExpression, sameRawReferenceType } from '../java/expressions.js';
 import { expressionType } from '../../ast/types.js';
@@ -87,9 +88,23 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       return ['~' + exprStr((e as { operand: Expr }).operand, rc, PREC.unary), PREC.unary];
     }
     case 'cast': {
+      if (e.intersectionTypes) {
+        let operand: Expr = e;
+        for (let i = 0; i < e.intersectionTypes.length; i++) {
+          if (operand.kind === 'cast') operand = operand.expr;
+        }
+        return [
+          `(${e.intersectionTypes.map((type) => typeStr(type, rc)).join(' & ')}) ${exprStr(operand, rc, PREC.unary)}`,
+          PREC.cast,
+        ];
+      }
       const t = typeStr(e.jtype, rc);
       let operand = e.expr;
-      while (operand.kind === 'cast' && sameRawReferenceType(e.jtype, operand.jtype))
+      while (
+        operand.kind === 'cast' &&
+        !hasTypeAnnotations(operand.jtype) &&
+        sameRawReferenceType(e.jtype, operand.jtype)
+      )
         operand = operand.expr;
       const inner = exprStr(operand, rc, PREC.unary, true, e.jtype);
       return [`(${t}) ${inner}`, PREC.cast];
@@ -105,6 +120,10 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         const lam = rc.lambdaResolver(e);
         if (lam !== null) return [lam, PREC.lambda];
       }
+      const typeArgs = e.typeArguments?.length
+        ? `<${e.typeArguments.map((type) => typeStr(type, rc)).join(', ')}>`
+        : '';
+      const methodName = typeArgs + e.name;
       const args = e.args.map((a) => exprStr(a, rc, PREC.lambda));
       if (e.mode === 'static') {
         const acc = resolveAccessor(rc, e.owner, e.name);
@@ -114,30 +133,58 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
           const val = e.args[1] ? exprStr(e.args[1], rc, PREC.assign) : '?';
           return [`${tgt}.${acc.field} = ${val}`, PREC.assign];
         }
-        if (e.owner === rc.className) return [formatJavaCall(e.name, args), PREC.postfix];
-        return [formatJavaCall(`${resolve(e.owner, rc)}.${e.name}`, args), PREC.postfix];
+        if (e.owner === rc.className)
+          return [
+            formatJavaCall(
+              typeArgs
+                ? `${e.mode === 'static' ? resolve(e.owner, rc) : 'this'}.${methodName}`
+                : e.name,
+              args,
+            ),
+            PREC.postfix,
+          ];
+        return [formatJavaCall(`${resolve(e.owner, rc)}.${methodName}`, args), PREC.postfix];
       }
       if (e.superCall) {
-        if (e.name === '<init>') return [formatJavaCall('super', args), PREC.postfix];
+        if (e.name === '<init>') return [formatJavaCall(typeArgs + 'super', args), PREC.postfix];
         if (e.owner !== rc.className && !isClassSuper(e.owner, rc)) {
-          return [formatJavaCall(`${resolve(e.owner, rc)}.super.${e.name}`, args), PREC.postfix];
+          return [
+            formatJavaCall(`${resolve(e.owner, rc)}.super.${methodName}`, args),
+            PREC.postfix,
+          ];
         }
-        return [formatJavaCall(`super.${e.name}`, args), PREC.postfix];
+        return [formatJavaCall(`super.${methodName}`, args), PREC.postfix];
       }
-      if (e.name === '<init>') return [formatJavaCall('this', args), PREC.postfix];
+      if (e.name === '<init>') return [formatJavaCall(typeArgs + 'this', args), PREC.postfix];
       if (e.target) {
         if (e.target.kind === 'this' && e.owner === rc.className) {
-          return [formatJavaCall(e.name, args), PREC.postfix];
+          return [formatJavaCall(typeArgs ? `this.${methodName}` : e.name, args), PREC.postfix];
         }
         const ts = exprStr(e.target, rc, PREC.postfix);
-        return [formatJavaCall(`${ts}.${e.name}`, args), PREC.postfix];
+        return [formatJavaCall(`${ts}.${methodName}`, args), PREC.postfix];
       }
-      return [formatJavaCall(e.name, args), PREC.postfix];
+      return [formatJavaCall(typeArgs ? `this.${methodName}` : e.name, args), PREC.postfix];
     }
     case 'new': {
+      const typeArgs = e.typeArguments?.length
+        ? `<${e.typeArguments.map((type) => typeStr(type, rc)).join(', ')}> `
+        : '';
       const anon = rc.anonClasses?.get(e.owner);
       if (anon) {
-        const superDisplay = resolve(anon.superInternal, rc);
+        const cf = rc.ctx.lookup(e.owner);
+        const superAnnotations = cf?.typeAnnotations?.filter(
+          (entry) =>
+            entry.targetType === 0x10 &&
+            entry.index ===
+              (cf.superName === anon.superInternal
+                ? 65535
+                : cf.interfaces.indexOf(anon.superInternal)),
+        );
+        const superDisplay = typeStr(
+          e.annotatedType ??
+            annotatedType({ kind: 'class', name: anon.superInternal }, superAnnotations, rc.ctx),
+          rc,
+        );
         const args = (anon.superArgIndices ?? []).map((index) =>
           exprStr(e.args[index], rc, PREC.lambda),
         );
@@ -157,7 +204,10 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         }
         const bodyLines = anon.renderMembers(captureValues);
         const body = indentJava(bodyLines.join('\n'), 1);
-        return [`${formatJavaCall(`new ${superDisplay}`, args)} {\n${body}\n}`, PREC.postfix - 2];
+        return [
+          `${formatJavaCall(`new ${typeArgs}${superDisplay}`, args)} {\n${body}\n}`,
+          PREC.postfix - 2,
+        ];
       }
       const local = rc.localClasses?.get(e.owner);
       if (local) {
@@ -177,17 +227,32 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
             prefix = `${exprStr(first, rc, PREC.postfix)}.`;
           }
         }
-        return [formatJavaCall(`${prefix}new ${innerCtor.simpleName}`, args), PREC.postfix - 1];
+        return [
+          formatJavaCall(
+            `${prefix}new ${typeArgs}${e.annotatedType ? typeStr(e.annotatedType, rc).slice(typeStr(e.annotatedType, rc).lastIndexOf('.') + 1) : innerCtor.simpleName}`,
+            args,
+          ),
+          PREC.postfix - 1,
+        ];
       }
-      const ownerDisplay = resolve(e.owner, rc);
+      const ownerDisplay = e.annotatedType ? typeStr(e.annotatedType, rc) : resolve(e.owner, rc);
       const args = e.args.map((a) => exprStr(a, rc, PREC.lambda));
       if (e.outer) {
         const os = exprStr(e.outer, rc, PREC.postfix);
         return [formatJavaCall(`${os}.new ${simpleOf(ownerDisplay)}`, args), PREC.postfix - 1];
       }
-      return [formatJavaCall(`new ${ownerDisplay}`, args), PREC.postfix - 1];
+      return [formatJavaCall(`new ${typeArgs}${ownerDisplay}`, args), PREC.postfix - 1];
     }
     case 'new-array': {
+      if (e.annotatedType)
+        return [
+          `new ${typeStr(
+            e.annotatedType,
+            rc,
+            e.dimsExprs.map((dimension) => `[${exprStr(dimension, rc, PREC.lambda)}]`),
+          )}`,
+          PREC.postfix - 1,
+        ];
       const elem = typeStr(e.elemType, rc);
       let s = elem;
       for (const d of e.dimsExprs) s += `[${exprStr(d, rc, PREC.lambda)}]`;
@@ -197,7 +262,10 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
     case 'array-init': {
       const elem = typeStr(e.elemType, rc);
       const vals = e.values.map((v) => exprStr(v, rc, PREC.lambda)).join(', ');
-      return [`new ${elem}[] { ${vals} }`, PREC.postfix - 1];
+      return [
+        `new ${e.annotatedType ? typeStr(e.annotatedType, rc) : elem + '[]'} { ${vals} }`,
+        PREC.postfix - 1,
+      ];
     }
     case 'array-length':
       return [`${exprStr(e.array, rc, PREC.postfix)}.length`, PREC.postfix];

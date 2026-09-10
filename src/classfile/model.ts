@@ -109,6 +109,7 @@ export interface LocalVarEntry {
 }
 
 export interface CodeAttr {
+  typeAnnotations?: TypeAnnotation[];
   stackMapFrames?: StackMapFrame[];
   maxStack: number;
   maxLocals: number;
@@ -120,6 +121,7 @@ export interface CodeAttr {
 }
 
 export interface FieldInfo {
+  typeAnnotations?: TypeAnnotation[];
   access: number;
   name: string;
   descriptor: string;
@@ -131,6 +133,7 @@ export interface FieldInfo {
 }
 
 export interface MethodInfo {
+  typeAnnotations?: TypeAnnotation[];
   access: number;
   name: string;
   descriptor: string;
@@ -153,13 +156,27 @@ export interface InnerClassInfo {
 }
 
 export interface RecordComponent {
+  typeAnnotations?: TypeAnnotation[];
   name: string;
   descriptor: string;
   signature?: string;
   annotations: Ann[];
 }
 
+export interface TypeAnnotation {
+  targetType: number;
+  index?: number;
+  boundIndex?: number;
+  offset?: number;
+  typeArgumentIndex?: number;
+  table?: { start: number; length: number; index: number }[];
+  path: { kind: number; index: number }[];
+  annotation: Ann;
+  visible: boolean;
+}
+
 export interface ClassFile {
+  typeAnnotations?: TypeAnnotation[];
   minorVersion: number;
   majorVersion: number;
   access: number;
@@ -179,6 +196,7 @@ export interface ClassFile {
   bootstrapMethods: BootstrapMethod[];
   annotations: Ann[];
   unknownAttrs: string[];
+
   cp: ConstantPool;
 }
 

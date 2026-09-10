@@ -249,7 +249,12 @@ export class Simulator {
       const exec = endsWithTerm ? b.instrs.slice(0, -1) : b.instrs;
       for (let ii = 0; ii < exec.length; ii++) {
         const before = stmts.length;
+        const prior = stack.items.map((item) => item.e);
         this.execInstr(exec[ii], stack, stmts, b, ii < exec.length - 1 ? ii : undefined);
+        if (this.method.code?.typeAnnotations?.length) {
+          for (const item of stack.items)
+            if (!prior.includes(item.e)) item.e.bytecodeOffset ??= exec[ii].pc;
+        }
         for (let j = before; j < stmts.length; j++) {
           const stmt = stmts[j];
           if (stmt.kind === 'expr' && stmt.expr.kind === 'invoke')

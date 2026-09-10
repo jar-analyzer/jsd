@@ -201,3 +201,59 @@ test('malformed member descriptors fail during parsing and are isolated in batch
     );
   }
 });
+
+test('duplicate class names report the replaced and selected batch inputs', () => {
+  const first = classBytes('Duplicate', [{ name: 'value', code: [4, 172] }]);
+  const second = classBytes('Duplicate', [{ name: 'value', code: [5, 172] }]);
+  const d = createDecompiler({
+    maxClasses: 1,
+    maxTotalInputBytes: Math.max(first.length, second.length),
+  });
+  d.addClasses(
+    new Map([
+      ['base.class', first],
+      ['version.class', second],
+    ]),
+  );
+  const result = d.decompileAllDetailed();
+  assert.equal(result.status, 'partial');
+  assert.equal(result.sources.length, 1);
+  assert.match(result.sources[0].source, /return 2;/);
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].code, 'DUPLICATE_CLASS');
+  assert.equal(result.diagnostics[0].className, 'Duplicate');
+  assert.equal(result.diagnostics[0].inputName, 'version.class');
+  assert.match(result.diagnostics[0].message, /base.class/);
+  assert.deepEqual(d.getDiagnostics(), result.diagnostics);
+  assert.deepEqual(d.decompileAllDetailed(), result);
+  d.addClasses(new Map([['version.class', first]]));
+  assert.equal(d.decompileAllDetailed().status, 'success');
+  assert.deepEqual(d.getDiagnostics(), []);
+});
+
+test('direct duplicate additions also report replacement without discarding the selected class', () => {
+  const d = createDecompiler();
+  d.addClass(valid());
+  d.addClass(valid());
+  assert.equal(d.getDiagnostics()[0].code, 'DUPLICATE_CLASS');
+  assert.equal(d.decompileAllDetailed().status, 'partial');
+  assert.equal(d.decompileAllDetailed().sources.length, 1);
+});
+
+test('dollar names without nesting metadata remain distinct top-level classes', () => {
+  const names = ['Example', 'Example$1', 'Example$Part', 'Example$1Local', 'Example_Part'];
+  const inputs = new Map(names.map((name) => [name + '.class', classBytes(name, [])]));
+  for (const [name, bytes] of inputs) {
+    const source = decompileClassFile(bytes);
+    assert.equal(source.path, name.replace(/\.class$/, '.java'));
+    assert.ok(source.source.includes(`public class ${name.slice(0, -6)} {`));
+    assert.equal(source.status, 'success');
+  }
+  const report = decompileClassSetDetailed(inputs);
+  assert.equal(report.status, 'success');
+  assert.deepEqual(
+    report.sources.map((source) => source.name),
+    names,
+  );
+  assert.equal(new Set(report.sources.map((source) => source.path)).size, names.length);
+});

@@ -2,7 +2,8 @@ import type { JavaFormatOptions } from './format/index.js';
 import type { Expr } from '../ast/ast.js';
 import { WorkBudget } from './budget.js';
 import { DiagnosticBag } from './diagnostics.js';
-import type { ClassFile, MethodInfo } from '../classfile/model.js';
+import { isAnonymousClass } from '../classfile/names.js';
+import type { ClassFile, InnerClassInfo, MethodInfo } from '../classfile/model.js';
 import type { JType } from '../classfile/types.js';
 import { parseFieldDescriptor, parseMethodDescriptor, parseSignature } from '../classfile/types.js';
 import type { LocalVarEntry } from '../classfile/model.js';
@@ -99,6 +100,7 @@ export class Ctx {
   >();
   readonly classes: Map<string, ClassFile>;
   readonly opts: DecompileOptions;
+  private readonly innerClasses = new Map<string, InnerClassInfo>();
   private typeRevisions = new Map<MethodInfo, number>();
   private slotTypesByMethod = new Map<MethodInfo, Map<number, Set<JType>>>();
 
@@ -112,6 +114,27 @@ export class Ctx {
     this.classes = all;
     this.opts = opts;
     if (!this.classes.has(cls.name)) this.classes.set(cls.name, cls);
+    for (const entry of cls.innerClasses) this.innerClasses.set(entry.inner, entry);
+  }
+
+  className(name: string, seen = new Set<string>()): string {
+    if (seen.has(name)) return name.replace(/\//g, '.');
+    seen.add(name);
+    const cls = this.lookup(name);
+    const inner =
+      cls?.innerClasses.find((entry) => entry.inner === name) ?? this.innerClasses.get(name);
+    if (inner?.outer && inner.innerName)
+      return `${this.className(inner.outer, seen)}.${inner.innerName}`;
+    if (inner?.innerName && cls?.enclosing)
+      return `${this.className(cls.enclosing.class, seen)}.${inner.innerName}`;
+    return cls ? name.replace(/\//g, '.') : name.replace(/[/$]/g, '.');
+  }
+
+  innerClass(name: string): InnerClassInfo | undefined {
+    return (
+      this.lookup(name)?.innerClasses.find((entry) => entry.inner === name) ??
+      this.innerClasses.get(name)
+    );
   }
 
   lookup(name: string): ClassFile | undefined {
@@ -184,8 +207,8 @@ export class Ctx {
     const same = list.every((t) => typeKey(t) === typeKey(list[0]));
     if (same) {
       const type = list[0];
-      if (type.kind === 'class' && /\$\d+$/.test(type.name)) {
-        const cls = this.lookup(type.name);
+      const cls = type.kind === 'class' ? this.lookup(type.name) : undefined;
+      if (cls && isAnonymousClass(cls)) {
         const name =
           cls?.superName && cls.superName !== 'java/lang/Object'
             ? cls.superName
