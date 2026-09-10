@@ -15,6 +15,13 @@ export function typeAnnotationText(annotations: Ann[] | undefined, rc: RenderCtx
     .join(' ');
 }
 
+export function memberTypeStr(type: JType, name: string, rc: RenderCtx): string {
+  if (type.kind !== 'class') throw new Error('Expected a class type for member construction');
+  const annotations = typeAnnotationText(type.annotations, rc);
+  const args = type.args?.length ? `<${type.args.map((arg) => typeStr(arg, rc)).join(', ')}>` : '';
+  return `${annotations ? annotations + ' ' : ''}${name}${args}`;
+}
+
 export function typeStr(t: JType, rc: RenderCtx, dimensions?: string[]): string {
   const annotations = typeAnnotationText(t.annotations, rc);
   const prefix = annotations ? annotations + ' ' : '';

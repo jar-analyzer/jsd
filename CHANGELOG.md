@@ -14,6 +14,8 @@ changelog:
 - Preserve external primitive field assignments.
 - Preserve dollar signs in class names.
 - Restore Java type-use annotations.
+- Handle JDK 8 type annotation offsets.
+- Preserve annotations on inner class creation.
 - Report duplicate class replacements.
 - Expand regression coverage.
 
@@ -27,6 +29,8 @@ changelog:
 - 保留对外部类基本类型字段的赋值。
 - 保留类名中的 $ 符号。
 - 恢复 Java 类型使用注解。
+- 兼容 JDK 8 类型注解位置。
+- 保留内部类创建时的注解。
 - 报告同名类覆盖。
 - 扩充回归测试覆盖。
 

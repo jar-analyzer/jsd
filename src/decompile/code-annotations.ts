@@ -1,5 +1,5 @@
 import { isAnonymousClass } from '../classfile/names.js';
-import { walkStmt, walkStmtExprs, type Expr, type Stmt } from '../ast/ast.js';
+import { walkExpr, walkStmt, walkStmtExprs, type Expr, type Stmt } from '../ast/ast.js';
 import { expressionType } from '../ast/types.js';
 import type { Instr } from '../bytecode/decode.js';
 import type { ClassFile, MethodInfo, TypeAnnotation } from '../classfile/model.js';
@@ -115,6 +115,23 @@ export function applyCodeTypeAnnotations(
                     ? expr.kind === 'new' || expr.kind === 'invoke'
                     : expr.kind === 'invoke' || expr.kind === 'method-ref'),
         );
+        if (!expr && [0x43, 0x47, 0x49].includes(entry.targetType)) {
+          expr = [...ordered].reverse().find((candidate) => {
+            if (
+              entry.targetType === 0x43
+                ? candidate.kind !== 'instanceof'
+                : entry.targetType === 0x47
+                  ? candidate.kind !== 'cast'
+                  : candidate.kind !== 'invoke' || !!candidate.bootstrap
+            )
+              return false;
+            let start = candidate.bytecodeOffset ?? Infinity;
+            walkExpr(candidate, (child) => {
+              start = Math.min(start, child.bytecodeOffset ?? Infinity);
+            });
+            return start === entry.offset;
+          });
+        }
         if (!expr && entry.targetType === 0x44)
           expr = ordered.find(
             (expr) =>
@@ -125,8 +142,9 @@ export function applyCodeTypeAnnotations(
           const candidate = ordered.find(
             (expr) =>
               expr.bytecodeOffset !== undefined &&
-              expr.bytecodeOffset + (instructionAt.get(expr.bytecodeOffset)?.size ?? 0) ===
-                entry.offset &&
+              (expr.bytecodeOffset === entry.offset ||
+                expr.bytecodeOffset + (instructionAt.get(expr.bytecodeOffset)?.size ?? 0) ===
+                  entry.offset) &&
               !['assign-expr', 'instanceof'].includes(expr.kind),
           );
           if (candidate) {

@@ -15,7 +15,12 @@ function annotatedClass(
   location: Location,
   visible: boolean,
   count = 1,
-  options: { target?: number[]; path?: number[]; trailing?: number[] } = {},
+  options: {
+    target?: number[];
+    path?: number[];
+    trailing?: number[];
+    expression?: 'cast' | 'instanceof' | 'identity-cast';
+  } = {},
 ): Uint8Array {
   const b = new DynamicClassBuilder('Annotated');
   const u2 = (n: number) => [n >>> 8, n & 255];
@@ -26,7 +31,13 @@ function annotatedClass(
   const fieldName = b.utf8('item');
   const fieldType = b.utf8('Ljava/lang/String;');
   const methodName = b.utf8('value');
-  const methodType = b.utf8('()Ljava/lang/String;');
+  const methodType = b.utf8(
+    options.expression === 'instanceof'
+      ? '(Ljava/lang/Object;)Z'
+      : options.expression
+        ? '(Ljava/lang/String;)Ljava/lang/String;'
+        : '()Ljava/lang/String;',
+  );
   const codeName = b.utf8('Code');
   const recordName = b.utf8('Record');
   const attributeName = b.utf8(
@@ -51,8 +62,23 @@ function annotatedClass(
   const attribute = (name: number, data: number[]) => [...u2(name), ...u4(data.length), ...data];
   const annotations = attribute(attributeName, annotation);
   const attrs = (target: Location) => (location === target ? [...u2(1), ...annotations] : u2(0));
-  const code = [1, 192, ...u2(string), 176];
-  const body = [0, 1, 0, 0, ...u4(code.length), ...code, 0, 0, ...attrs('code')];
+  const code =
+    options.expression === 'instanceof'
+      ? [42, 193, ...u2(string), 172]
+      : options.expression === 'identity-cast'
+        ? [42, 176]
+        : [options.expression ? 42 : 1, 192, ...u2(string), 176];
+  const body = [
+    0,
+    1,
+    0,
+    options.expression ? 1 : 0,
+    ...u4(code.length),
+    ...code,
+    0,
+    0,
+    ...attrs('code'),
+  ];
   const methods = [
     0,
     1,
@@ -186,5 +212,27 @@ test('type annotation target payloads retain indices, offsets and local ranges',
     for (const [key, value] of Object.entries(expected))
       assert.deepEqual(entry[key as keyof typeof entry], value);
     assert.deepEqual(entry.path, [{ kind: 3, index: 0 }]);
+  }
+});
+
+test('code type annotations accept instruction and expression-start offsets', () => {
+  for (const visible of [true, false]) {
+    for (const expression of ['cast', 'instanceof', 'identity-cast'] as const) {
+      for (const offset of [0, 1]) {
+        const target = expression === 'instanceof' ? [0x43, 0, offset] : [0x47, 0, offset, 0];
+        const result = decompileClassFile(
+          annotatedClass('code', visible, 1, { expression, target }),
+        );
+        assert.equal(
+          result.status,
+          'success',
+          JSON.stringify({ expression, offset, diagnostics: result.diagnostics }),
+        );
+        assert.match(
+          result.source,
+          expression === 'instanceof' ? /instanceof @Marker String/ : /\(@Marker String\)/,
+        );
+      }
+    }
   }
 });

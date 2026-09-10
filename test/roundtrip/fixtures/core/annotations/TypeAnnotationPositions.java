@@ -27,6 +27,11 @@ public class TypeAnnotationPositions<T> {
     void method(TypeAnnotationPositions<T>.@PositionMark("receiver") Member<U> this) {}
   }
 
+  static Object memberAllocation() {
+    TypeAnnotationPositions owner = new TypeAnnotationPositions("owner");
+    return owner.new @PositionMark("member.x.y\"z") Member();
+  }
+
   static Runnable anonymous() {
     return new @PositionMark("anonymousSuper") Runnable() {
       public @PositionMark("anonymousField") String value;
@@ -50,6 +55,7 @@ public class TypeAnnotationPositions<T> {
 
   public static void main(String[] args) throws Exception {
     System.out.println(local("value"));
+    System.out.println(memberAllocation().getClass().getSimpleName());
     System.out.println(anonymous().getClass().getAnnotatedInterfaces()[0].getAnnotations().length);
     System.out.println(TypeAnnotationPositions.class.getField("value").getAnnotations().length);
     System.out.println(

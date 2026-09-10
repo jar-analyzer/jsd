@@ -322,3 +322,30 @@ test('nested block lambdas accumulate one indentation level per body', () => {
     ['() -> {', '    listen(() -> {', '        return;', '    });', '}'].join('\n'),
   );
 });
+
+test('qualified member creation preserves annotation values and generic argument names', () => {
+  const expr: Expr = {
+    kind: 'new',
+    owner: 'example/Outer$Member',
+    outer: { kind: 'local', slot: 1, name: 'owner' },
+    args: [],
+    annotatedType: {
+      kind: 'class',
+      name: 'example/Outer$Member',
+      owner: { kind: 'class', name: 'example/Outer' },
+      annotations: [
+        {
+          typeName: 'Marker',
+          pairs: [{ name: 'value', value: { kind: 'const', tag: 's', value: 'x.y' } }],
+        },
+      ],
+      args: [{ kind: 'class', name: 'java/lang/String' }],
+    },
+  };
+  const before = structuredClone(expr);
+  freeze(expr);
+  const rc = context();
+  rc.slotNames.set(1, 'owner');
+  assert.equal(exprStr(expr, rc), 'owner.new @Marker(value = "x.y") Member<java.lang.String>()');
+  assert.deepEqual(expr, before);
+});

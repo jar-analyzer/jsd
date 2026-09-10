@@ -16,7 +16,7 @@ import {
   resolveAccessor,
   outerOf,
 } from './context.js';
-import { typeStr, nestedDisplay, simpleOf } from './types.js';
+import { typeStr, memberTypeStr, nestedDisplay, simpleOf } from './types.js';
 
 export { escapeString } from './literals.js';
 
@@ -229,7 +229,7 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         }
         return [
           formatJavaCall(
-            `${prefix}new ${typeArgs}${e.annotatedType ? typeStr(e.annotatedType, rc).slice(typeStr(e.annotatedType, rc).lastIndexOf('.') + 1) : innerCtor.simpleName}`,
+            `${prefix}new ${typeArgs}${e.annotatedType ? memberTypeStr(e.annotatedType, innerCtor.simpleName, rc) : innerCtor.simpleName}`,
             args,
           ),
           PREC.postfix - 1,
@@ -239,7 +239,13 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       const args = e.args.map((a) => exprStr(a, rc, PREC.lambda));
       if (e.outer) {
         const os = exprStr(e.outer, rc, PREC.postfix);
-        return [formatJavaCall(`${os}.new ${simpleOf(ownerDisplay)}`, args), PREC.postfix - 1];
+        return [
+          formatJavaCall(
+            `${os}.new ${typeArgs}${e.annotatedType ? memberTypeStr(e.annotatedType, simpleOf(resolve(e.owner, rc)), rc) : simpleOf(ownerDisplay)}`,
+            args,
+          ),
+          PREC.postfix - 1,
+        ];
       }
       return [formatJavaCall(`new ${typeArgs}${ownerDisplay}`, args), PREC.postfix - 1];
     }
