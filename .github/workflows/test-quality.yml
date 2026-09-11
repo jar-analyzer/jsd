@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Format, types, bundle and documentation
+    name: Format, types, bundle, docs and browser
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,3 +28,4 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npm run docs:check
+      - run: npm run test:browser

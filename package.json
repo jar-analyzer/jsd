@@ -49,7 +49,8 @@
     "test:bytecode": "node test/run.mjs bytecode",
     "test:package": "node test/run.mjs package",
     "test:fuzz": "node test/run.mjs fuzz",
-    "test:all": "node test/run.mjs all"
+    "test:all": "node test/run.mjs all",
+    "test:browser": "node test/run.mjs browser"
   },
   "license": "MIT",
   "devDependencies": {

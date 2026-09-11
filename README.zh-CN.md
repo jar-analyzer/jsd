@@ -64,7 +64,8 @@ console.log(result.source);
 | 格式              |      — | Node.js 24          |
 | 类型              |      — | Node.js 24          |
 | 产物与体积        |      — | Node.js 24          |
-| 单元测试          |    314 | Node.js 24          |
+| 浏览器布局        |      4 | Chrome/Chromium     |
+| 单元测试          |    323 | Node.js 24          |
 | Java 往返：带调试 |    172 | JDK 8/11/17/21/25   |
 | Java 往返：无调试 |    172 | JDK 8/17/25         |
 | Java 9–25：带调试 |    ≤18 | JDK 21/25           |

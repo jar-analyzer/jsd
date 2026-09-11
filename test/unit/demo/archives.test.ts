@@ -83,7 +83,14 @@ test('class families do not include entries from similarly named nested archives
     ['Outer$lib.jar/A.class', bytes],
   ]);
   assert.deepEqual(
-    classFamily(files, 'Outer.class').files.map(([path]: [string]) => path),
+    classFamily(
+      files,
+      'Outer.class',
+      new Map([
+        ['Outer.class', { name: 'Outer' }],
+        ['Outer$Inner.class', { name: 'Outer$Inner', enclosing: 'Outer' }],
+      ]),
+    ).files.map(([path]: [string]) => path),
     ['Outer.class', 'Outer$Inner.class'],
   );
 });

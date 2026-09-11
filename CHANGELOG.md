@@ -20,6 +20,9 @@ changelog:
 - Preserve boolean narrowing and float NaN payloads.
 - Report duplicate class replacements.
 - Synchronize demo and bilingual size data with CI checks.
+- Show enclosing classes in demo navigation without hiding standalone dollar names.
+- Keep demo line numbers fixed at the left across source changes and scrolling.
+- Report damaged legacy inner accessors without aborting decompilation.
 - Expand regression coverage.
 
 更新内容:
@@ -38,6 +41,9 @@ changelog:
 - 保留 boolean 窄化和 float NaN 原始位模式。
 - 报告同名类覆盖。
 - 同步 demo 和双语体积数据，并接入 CI 校验。
+- Demo 导航合并内部类条目，保留独立的 $ 类名。
+- 修复 demo 行号列随源码长度和滚动偏移的问题。
+- 修复旧版内部类访问器损坏时反编译崩溃的问题。
 - 扩充回归测试覆盖。
 
 ## 1.1.0

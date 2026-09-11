@@ -10,6 +10,19 @@ export function recoverInnerAccessor(
   method: MethodInfo,
   args?: Expr[],
 ): Expr | undefined {
+  try {
+    return matchInnerAccessor(ctx, cls, method, args);
+  } catch {
+    return undefined;
+  }
+}
+
+function matchInnerAccessor(
+  ctx: Ctx,
+  cls: ClassFile,
+  method: MethodInfo,
+  args?: Expr[],
+): Expr | undefined {
   if (
     !(method.access & Acc.Static) ||
     (method.access & (Acc.Synchronized | Acc.Strict)) !== 0 ||

@@ -257,3 +257,44 @@ test('dollar names without nesting metadata remain distinct top-level classes', 
   );
   assert.equal(new Set(report.sources.map((source) => source.path)).size, names.length);
 });
+
+for (const [label, code, stage] of [
+  ['unknown opcode', [0x2a, 0xdc, 0xac], 'decode'],
+  ['truncated instruction', [0x2a, 0xb4], 'decode'],
+  ['invalid field reference', [0x2a, 0xb4, 0xff, 0xff, 0xac], 'simulate'],
+] as const) {
+  test(`damaged inner accessor with ${label} retains its method diagnostic and healthy source`, () => {
+    const bytes = classBytes(
+      'Outer$Inner',
+      [
+        { name: 'access$000', descriptor: '(LOuter$Inner;)I', access: 0x1008, code: [...code] },
+        { name: 'value', code: [0x04, 0xac] },
+      ],
+      'Outer',
+      0x0001,
+    );
+    const single = decompileClassFile(bytes);
+    assert.equal(single.status, 'partial');
+    assert.match(single.source, /access\$000/);
+    assert.match(single.source, /return 1;/);
+    assert.equal(single.diagnostics.length, 1);
+    assert.equal(single.diagnostics[0].code, 'METHOD_DECOMPILE_FAILED');
+    assert.equal(single.diagnostics[0].stage, stage);
+    assert.equal(single.diagnostics[0].methodName, 'access$000');
+    const d = createDecompiler();
+    d.addClasses(
+      new Map([
+        ['Outer.class', classBytes('Outer', [])],
+        ['Outer$Inner.class', bytes],
+        ['Healthy.class', valid()],
+      ]),
+    );
+    const batch = d.decompileAllDetailed();
+    assert.equal(batch.status, 'partial');
+    assert.equal(batch.sources.length, 2);
+    assert.equal(batch.sources.find((source) => source.name === 'Healthy')?.status, 'success');
+    assert.equal(batch.sources.find((source) => source.name === 'Outer')?.status, 'partial');
+    assert.deepEqual(batch.diagnostics, single.diagnostics);
+    assert.deepEqual(d.decompileAllDetailed(), batch);
+  });
+}

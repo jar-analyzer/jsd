@@ -1,7 +1,14 @@
 export function classBytes(
   name: string,
-  methods: { name: string; descriptor?: string; maxLocals?: number; code: number[] }[],
+  methods: {
+    name: string;
+    descriptor?: string;
+    maxLocals?: number;
+    access?: number;
+    code: number[];
+  }[],
   outer?: string,
+  innerAccess = 0x0009,
 ): Uint8Array {
   const u2 = (n: number): number[] => [(n >>> 8) & 255, n & 255];
   const u4 = (n: number): number[] => [
@@ -36,7 +43,7 @@ export function classBytes(
       ...u2(0),
     ];
     return [
-      ...u2(0x0009),
+      ...u2(m.access ?? 0x0009),
       ...u2(methodName),
       ...u2(descriptor),
       ...u2(1),
@@ -58,7 +65,7 @@ export function classBytes(
       ...u2(thisClass),
       ...u2(outerClass),
       ...u2(innerName),
-      ...u2(0x0009),
+      ...u2(innerAccess),
     ];
   }
   return Uint8Array.from([

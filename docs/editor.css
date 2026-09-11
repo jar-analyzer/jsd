@@ -69,7 +69,8 @@
 }
 #code {
   padding: 10px 0 30px;
-  display: table;
+  display: flex;
+  width: max-content;
   min-width: 100%;
   tab-size: 4;
   font:
@@ -80,9 +81,10 @@
     monospace;
 }
 #code .ln {
-  display: table-cell;
+  flex: none;
   position: sticky;
   left: 0;
+  z-index: 1;
   background: var(--code-bg);
   color: #858585;
   text-align: right;
@@ -91,7 +93,7 @@
   white-space: pre;
 }
 #code .src {
-  display: table-cell;
+  flex: 1 0 auto;
   padding-right: 28px;
   white-space: pre;
 }

@@ -64,7 +64,8 @@ console.log(result.source);
 | Formatting           |     — | Node.js 24          |
 | Types                |     — | Node.js 24          |
 | Bundle & sizes       |     — | Node.js 24          |
-| Unit                 |   314 | Node.js 24          |
+| Browser layout       |     4 | Chrome/Chromium     |
+| Unit                 |   323 | Node.js 24          |
 | Round-trip: debug    |   172 | JDK 8/11/17/21/25   |
 | Round-trip: no debug |   172 | JDK 8/17/25         |
 | Java 9–25: debug     |   ≤18 | JDK 21/25           |
@@ -75,7 +76,7 @@ console.log(result.source);
 | Package              |     — | Node.js 20/24       |
 | Fuzz                 | 2,000 | Node.js 24 + JDK 25 |
 
-Legacy fixtures verify recovered sources against both the original target and the current JDK target. 
+Legacy fixtures verify recovered sources against both the original target and the current JDK target.
 
 JDK 8 validates Java 6/7 targets; newer JDKs use their oldest supported target when necessary.
 

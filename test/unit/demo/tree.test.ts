@@ -62,3 +62,15 @@ test('normal scroll position survives filtering and a new workspace clears old t
   assert.equal(state.scroll.size, 0);
   assert.equal(state.isOpen('root/a', 1), false);
 });
+
+test('replacing a hidden inner entry with its outer refreshes the tree without closing folders', () => {
+  const state = new TreeState();
+  const files = new Map([['p/Outer$Inner.class', new Uint8Array()]]);
+  state.update(files, '');
+  state.setOpen('p', true);
+  files.delete('p/Outer$Inner.class');
+  files.set('p/Outer.class', new Uint8Array());
+  assert.equal(state.update(files, ''), true);
+  assert.equal(state.isOpen('p', 2), true);
+  assert.equal(state.update(files, ''), false);
+});

@@ -1,4 +1,5 @@
-import { decompileClassSetDetailed } from './jsd.browser.js';
+import { describeClasses } from './class-index.js';
+import { decompileClassSetDetailed, parseClass } from './jsd.browser.js';
 import { collectClasses } from './files.js';
 
 self.onmessage = async ({ data }) => {
@@ -14,7 +15,7 @@ self.onmessage = async ({ data }) => {
           throw new Error('ARCHIVE_UNAVAILABLE');
         }
       }
-      result = collectClasses(data.inputs, unzip);
+      result = describeClasses(collectClasses(data.inputs, unzip), parseClass);
     } else result = decompileClassSetDetailed(new Map(data.files));
     const transfers =
       data.action === 'load' ? [...new Set(result.map(([, bytes]) => bytes.buffer))] : [];

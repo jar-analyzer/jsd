@@ -1,27 +1,19 @@
-export function classFamily(files, path) {
-  let root = path;
-  const stem = path.replace(/\.class$/i, '');
-  for (let index = stem.lastIndexOf('$'); index >= 0; index = stem.lastIndexOf('$', index - 1)) {
-    if (index < stem.lastIndexOf('/')) break;
-    const candidate = stem.slice(0, index) + '.class';
-    if (files.has(candidate)) root = candidate;
-    if (index === 0) break;
-  }
-  const base = root.replace(/\.class$/i, '');
-  const directory = root.slice(0, root.lastIndexOf('/') + 1);
+import { classRoots } from './class-index.js';
+
+export function classFamily(files, path, metadata = new Map()) {
+  const roots = classRoots(files, metadata);
+  const root = roots.get(path) ?? path;
   return {
     root,
-    files: [...files].filter(
-      ([name]) =>
-        /\.class$/i.test(name) &&
-        name.slice(0, name.lastIndexOf('/') + 1) === directory &&
-        (name === root || name.replace(/\.class$/i, '').startsWith(base + '$')),
-    ),
+    files: [...files].filter(([name]) => /\.class$/i.test(name) && roots.get(name) === root),
   };
 }
 
 export class Workspace {
   files = new Map();
+  classInfo = new Map();
+  roots = new Map();
+  visibleFiles = new Map();
   cache = new Map();
   cacheInputs = new Map();
   tabResults = new Map();
@@ -41,11 +33,11 @@ export class Workspace {
     const revision = this.revision;
     const entries = await extract([{ name: path, bytes }]);
     if (ticket !== this.selection || revision !== this.revision) return false;
-    const additions = entries.map(([name, data]) => [`${path}/${name}`, data]);
+    const additions = entries.map(([name, data, info]) => [`${path}/${name}`, data, info]);
     for (const [name] of additions) {
       if (this.files.has(name)) throw new Error(`DUPLICATE: ${name}`);
     }
-    for (const [name, data] of additions) this.files.set(name, data);
+    this.add(additions);
     this.archives.add(path);
     return true;
   }
@@ -56,7 +48,22 @@ export class Workspace {
       if (names.has(name)) throw new Error(`DUPLICATE: ${name}`);
       names.add(name);
     }
-    for (const [name, bytes] of entries) this.files.set(name, bytes);
+    for (const [name, bytes, info] of entries) {
+      this.files.set(name, bytes);
+      if (info) this.classInfo.set(name, info);
+    }
+    this.updateVisibleFiles();
+  }
+
+  updateVisibleFiles() {
+    const roots = classRoots(this.files, this.classInfo);
+    this.roots = roots;
+    for (const path of this.visibleFiles.keys()) {
+      if (!this.files.has(path) || roots.get(path) !== path) this.visibleFiles.delete(path);
+    }
+    for (const [path, bytes] of this.files) {
+      if (roots.get(path) === path) this.visibleFiles.set(path, bytes);
+    }
   }
 
   closeTabs(path, mode = 'current') {
@@ -85,7 +92,12 @@ export class Workspace {
   }
 
   replace(entries) {
-    this.files = new Map(entries);
+    this.visibleFiles = new Map();
+    this.files = new Map(entries.map(([path, bytes]) => [path, bytes]));
+    this.classInfo = new Map(
+      entries.filter(([, , info]) => info).map(([path, , info]) => [path, info]),
+    );
+    this.updateVisibleFiles();
     this.cache.clear();
     this.cacheInputs.clear();
     this.tabResults.clear();
@@ -106,8 +118,9 @@ export class Workspace {
   async select(path, decompile) {
     const ticket = ++this.selection;
     const revision = this.revision;
+    const family = classFamily(this.files, path, this.classInfo);
+    path = family.root;
     this.selected = path;
-    const family = classFamily(this.files, path);
     let result = this.cache.get(family.root);
     const inputs = this.cacheInputs.get(family.root);
     if (
@@ -131,7 +144,8 @@ export class Workspace {
         throw error;
       }
       if (revision !== this.revision) return null;
-      const output = report.sources[0];
+      const name = this.classInfo.get(family.root)?.name;
+      const output = report.sources.find((source) => source.name === name) ?? report.sources[0];
       result = {
         name: output?.name ?? family.root.replace(/\.class$/i, ''),
         source: output?.source ?? '',
@@ -144,6 +158,9 @@ export class Workspace {
       this.cacheInputs.set(family.root, family.files);
     }
     if (ticket !== this.selection) return null;
+    const aliases = new Set(family.files.map(([name]) => name));
+    this.tabs = [...new Set(this.tabs.map((name) => (aliases.has(name) ? path : name)))];
+    for (const name of aliases) if (name !== path) this.tabResults.delete(name);
     if (!this.tabs.includes(path)) this.tabs.push(path);
     this.tabResults.set(path, result);
     this.current = result;

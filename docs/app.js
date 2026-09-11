@@ -13,11 +13,11 @@ const workspace = new Workspace();
 const engine = new WorkerClient();
 const finder = setupFind(() => workspace.current?.source ?? '');
 setupQuickOpen(
-  () => workspace.files,
+  () => workspace.visibleFiles,
   (path) => {
     $('search').value = '';
     if (workspace.archives.has(path)) revealArchive(path);
-    buildTree(workspace.files, workspace.selected);
+    buildTree(workspace.selected);
     revealTreePath(path);
     selectClass(path);
   },
@@ -52,8 +52,8 @@ function closeTabs(path, mode) {
   if (workspace.currentPath) revealTreePath(workspace.currentPath);
 }
 
-function buildTree(files, selected, filter = '') {
-  drawTree(files, selected, filter, workspace.archives);
+function buildTree(selected, filter = '') {
+  drawTree(workspace.visibleFiles, selected, filter, workspace.archives);
 }
 
 function busy(key) {
@@ -69,12 +69,12 @@ function refresh() {
   $('btnSearch').disabled = $('btnQuickOpen').disabled = !workspace.files.size;
   $('toolbar').hidden = !workspace.files.size;
   $('btnClear').disabled = !workspace.files.size;
-  const count = [...workspace.files.keys()].filter((path) => /\.class$/i.test(path)).length;
+  const count = [...workspace.visibleFiles.keys()].filter((path) => /\.class$/i.test(path)).length;
   $('statFiles').textContent = workspace.files.size
     ? t(count === 1 ? 'classOne' : 'classMany', { n: count })
     : t('statNone');
   $('statCache').textContent = workspace.cache.size ? t('cached', { n: workspace.cache.size }) : '';
-  buildTree(workspace.files, workspace.selected, $('search').value.trim().toLowerCase());
+  buildTree(workspace.selected, $('search').value.trim().toLowerCase());
   renderSource(workspace.current);
   editorTabs.refresh();
   finder.refresh();
@@ -88,10 +88,10 @@ function cancel() {
   busy(null);
 }
 
-async function selectClass(path) {
+async function selectClass(path, force = false) {
   const archive = /\.(jar|war|zip)$/i.test(path);
   if (archive && workspace.archives.has(path)) return;
-  if (workspace.currentPath === path && !loadingKey) return;
+  if (!force && workspace.currentPath === path && !loadingKey) return;
   savePosition();
   const token = ++task;
   engine.cancel();
@@ -109,7 +109,7 @@ async function selectClass(path) {
       return;
     }
     const pending = workspace.select(path, (files) => engine.run('decompile', { files }));
-    buildTree(workspace.files, workspace.selected, $('search').value.trim().toLowerCase());
+    buildTree(workspace.selected, $('search').value.trim().toLowerCase());
     const result = await pending;
     if (token !== task || !result) return;
     refresh();
@@ -120,7 +120,7 @@ async function selectClass(path) {
   } finally {
     if (token === task) {
       busy(null);
-      buildTree(workspace.files, workspace.selected, $('search').value.trim().toLowerCase());
+      buildTree(workspace.selected, $('search').value.trim().toLowerCase());
     }
   }
 }
@@ -139,13 +139,17 @@ async function loadFiles(read) {
     workspace.add(entries);
     $('search').value = '';
     refresh();
-    const classes = entries.filter(([path]) => /\.class$/i.test(path));
-    const first =
-      classes.find(([path]) => !path.includes('$') && !path.endsWith('module-info.class')) ??
-      classes[0];
+    const classes = [
+      ...new Set(
+        entries
+          .filter(([path]) => /\.class$/i.test(path))
+          .map(([path]) => workspace.roots.get(path) ?? path),
+      ),
+    ];
+    const first = classes.find((path) => !path.endsWith('module-info.class')) ?? classes[0];
     if (first) {
-      revealTreePath(first[0]);
-      await selectClass(first[0]);
+      revealTreePath(first);
+      await selectClass(first, true);
     }
   } catch (error) {
     if (token === task && error.name !== 'AbortError') flash(errorText(error), true);
@@ -191,14 +195,14 @@ $('tree').addEventListener('click', (event) => {
   if (row?.dataset.path) selectClass(row.dataset.path);
 });
 $('search').addEventListener('input', () =>
-  buildTree(workspace.files, workspace.selected, $('search').value.trim().toLowerCase()),
+  buildTree(workspace.selected, $('search').value.trim().toLowerCase()),
 );
 $('search').addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     event.preventDefault();
     event.stopPropagation();
     $('search').value = '';
-    buildTree(workspace.files, workspace.selected);
+    buildTree(workspace.selected);
   }
   if (event.key === 'ArrowDown') {
     event.preventDefault();

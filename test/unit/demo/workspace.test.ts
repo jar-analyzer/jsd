@@ -24,7 +24,14 @@ test('inner class selection includes its outer family under archive prefixes', (
       'BOOT-INF/classes/p/Other.class',
     ].map((path) => [path, bytes]),
   );
-  const family = classFamily(files, 'BOOT-INF/classes/p/Outer$Inner.class');
+  const family = classFamily(
+    files,
+    'BOOT-INF/classes/p/Outer$Inner.class',
+    new Map([
+      ['BOOT-INF/classes/p/Outer.class', { name: 'p/Outer' }],
+      ['BOOT-INF/classes/p/Outer$Inner.class', { name: 'p/Outer$Inner', enclosing: 'p/Outer' }],
+    ]),
+  );
   assert.equal(family.root, 'BOOT-INF/classes/p/Outer.class');
   assert.equal(family.files.length, 2);
 });
@@ -32,8 +39,8 @@ test('inner class selection includes its outer family under archive prefixes', (
 test('cached inner and outer selections share source and retain partial diagnostics', async () => {
   const state = new Workspace();
   state.replace([
-    ['Outer.class', bytes],
-    ['Outer$Inner.class', bytes],
+    ['Outer.class', bytes, { name: 'Outer' }],
+    ['Outer$Inner.class', bytes, { name: 'Outer$Inner', enclosing: 'Outer' }],
   ]);
   const first = await state.select('Outer$Inner.class', async () => report('p/Outer', 'partial'));
   const second = await state.select('Outer.class', async () => {
@@ -179,22 +186,24 @@ test('adding files preserves open tabs and rejects duplicates atomically', async
 test('adding family members refreshes cached decompilation without losing open editors', async () => {
   const state = new Workspace();
   state.replace([
-    ['Outer$Inner.class', bytes],
+    ['Outer$Inner.class', bytes, { name: 'Outer$Inner', enclosing: 'Outer' }],
     ['B.class', bytes],
   ]);
   await state.select('Outer$Inner.class', async () => report('Inner'));
   await state.select('B.class', async () => report('B'));
-  state.add([['Outer.class', bytes]]);
+  state.add([['Outer.class', bytes, { name: 'Outer' }]]);
   state.closeTabs('B.class');
   assert.equal(state.current.name, 'Inner');
   await state.select('Outer$Inner.class', async (files) => {
     assert.equal(files.length, 2);
     return report('Outer');
   });
-  state.add([['Outer$Other.class', bytes]]);
+  state.add([['Outer$Other.class', bytes, { name: 'Outer$Other', enclosing: 'Outer' }]]);
+  assert.equal(state.roots.get('Outer$Other.class'), 'Outer.class');
   await state.select('Outer.class', async (files) => {
     assert.equal(files.length, 3);
     return report('OuterWithOther');
   });
   assert.equal(state.current.name, 'OuterWithOther');
+  assert.deepEqual(state.tabs, ['Outer.class']);
 });
