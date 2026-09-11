@@ -26,7 +26,7 @@ Supports common control flow, lambdas, nested classes, records and selected Java
 
 ## Usage
 
-npm package: [`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd), published version **1.1.0**.
+npm package: [`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd), published version **1.2.0**.
 
 ### 1. Browser
 
@@ -36,7 +36,7 @@ Load from the CDN and decompile a selected `.class` file.
 <input type="file" accept=".class" />
 <pre id="source"></pre>
 <script type="module">
-  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.1.0/dist/jsd.min.js';
+  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.2.0/dist/jsd.min.js';
 
   document.querySelector('input').onchange = async (event) => {
     const file = event.target.files[0];

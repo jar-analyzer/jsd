@@ -26,7 +26,7 @@ TypeScript 实现的 Java `.class` 反编译库，支持 Node.js 和浏览器。
 
 ## 使用
 
-npm 包：[`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd)，已发布版本 **1.1.0**。
+npm 包：[`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd)，已发布版本 **1.2.0**。
 
 ### 1. 浏览器
 
@@ -36,7 +36,7 @@ npm 包：[`@jar-analyzer/jsd`](https://www.npmjs.com/package/@jar-analyzer/jsd)
 <input type="file" accept=".class" />
 <pre id="source"></pre>
 <script type="module">
-  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.1.0/dist/jsd.min.js';
+  import { decompileClassFile } from 'https://cdn.jsdelivr.net/npm/@jar-analyzer/jsd@1.2.0/dist/jsd.min.js';
 
   document.querySelector('input').onchange = async (event) => {
     const file = event.target.files[0];
