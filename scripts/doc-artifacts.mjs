@@ -17,13 +17,13 @@ export function syncDocs(root, check = false) {
   for (const [path, pattern, replacement] of [
     [
       'README.md',
-      /Single ESM bundle: approximately \d+ KB, or \d+ KB with gzip\./,
-      `Single ESM bundle: approximately ${kb} KB, or ${gzipKb} KB with gzip.`,
+      /Single JS file: approximately \d+ KB, or \d+ KB with gzip\./,
+      `Single JS file: approximately ${kb} KB, or ${gzipKb} KB with gzip.`,
     ],
     [
       'README.zh-CN.md',
-      /单个 ESM 文件约 \d+ KB，gzip 后约 \d+ KB。/,
-      `单个 ESM 文件约 ${kb} KB，gzip 后约 ${gzipKb} KB。`,
+      /单个 JS 文件约 \d+ KB，gzip 后约 \d+ KB。/,
+      `单个 JS 文件约 ${kb} KB，gzip 后约 ${gzipKb} KB。`,
     ],
   ]) {
     updates.set(
