@@ -1,3 +1,4 @@
+import { expressionType } from '../../ast/types.js';
 import type { Expr } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import { adaptPrimitiveValue } from '../calls.js';
@@ -17,11 +18,21 @@ export function concatAppendArgument(
   ) {
     return adaptPrimitiveValue(args[0], param);
   }
-  if (param.kind === 'class' && param.name === 'java/lang/String') return args[0];
+  if (param.kind === 'class' && param.name === 'java/lang/String')
+    return args[0].kind === 'const' && args[0].ctype === 'null'
+      ? { kind: 'cast', jtype: param, expr: args[0] }
+      : args[0];
 }
 
 export function canConcatenateBuilder(parts: Expr[]): boolean {
-  return parts.some((part) => !isConstantExpression(part));
+  return (
+    parts.some((part) => !isConstantExpression(part)) &&
+    parts.some((part) => {
+      if (part.kind === 'const' && part.ctype === 'string') return String(part.value).length > 0;
+      const type = expressionType(part);
+      return type?.kind === 'prim' && type.name !== 'void';
+    })
+  );
 }
 
 function isConstantExpression(expr: Expr): boolean {

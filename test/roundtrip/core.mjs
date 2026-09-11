@@ -92,7 +92,7 @@ function legacyOpts(fixture) {
   const v = fixture.legacyRelease;
   const major = javacMajor();
   if (major >= 20) return ['--release', String(Math.max(v, 8))];
-  if (major >= 9) return ['--release', String(v)];
+  if (major >= 9) return ['--release', String(Math.max(v, 7))];
   return ['-source', String(v), '-target', String(v)];
 }
 
@@ -161,43 +161,45 @@ function runOne(fx, name) {
     }
   };
   walk(join(work, 'rt'));
-  const c2 = javac(join(work, 'rt'), javaFiles);
-  if (c2.status !== 0) {
-    return {
-      ok: false,
-      why: 'decompiled source does not compile',
-      detail: c2.error?.message ?? c2.stderr,
-      sources,
-    };
-  }
-
-  const r2 = java(join(work, 'rt'), mainCls);
-  if (r2.code !== 0) return { ok: false, why: 'decompiled run failed', detail: r2.out, sources };
-
-  checkExpectations(fixturesDir, name, join(work, 'rt'), r2.out, parseClass);
-  checkTypeAnnotations(fixturesDir, name, join(work, 'orig'), join(work, 'rt'), parseClass);
-  if (r1.out !== r2.out) {
-    return {
-      ok: false,
-      why: 'output mismatch',
-      detail: `--- original ---\n${r1.out}\n--- decompiled ---\n${r2.out}`,
-      sources,
-    };
-  }
-
-  if (fx.assertionsDisabled) {
-    const disabledOriginal = java(join(work, 'orig'), mainCls, [], '-da');
-    const disabledRecovered = java(join(work, 'rt'), mainCls, [], '-da');
-    if (
-      disabledOriginal.code !== 0 ||
-      disabledRecovered.code !== 0 ||
-      disabledOriginal.out !== disabledRecovered.out
-    )
+  for (const compileOptions of lo.length ? [lo, []] : [[]]) {
+    const c2 = javac(join(work, 'rt'), javaFiles, compileOptions);
+    if (c2.status !== 0) {
       return {
         ok: false,
-        why: 'assertions-disabled behavior mismatch',
-        detail: `${disabledOriginal.out}\n${disabledRecovered.out}`,
+        why: 'decompiled source does not compile',
+        detail: c2.error?.message ?? c2.stderr,
+        sources,
       };
+    }
+
+    const r2 = java(join(work, 'rt'), mainCls);
+    if (r2.code !== 0) return { ok: false, why: 'decompiled run failed', detail: r2.out, sources };
+
+    checkExpectations(fixturesDir, name, join(work, 'rt'), r2.out, parseClass);
+    checkTypeAnnotations(fixturesDir, name, join(work, 'orig'), join(work, 'rt'), parseClass);
+    if (r1.out !== r2.out) {
+      return {
+        ok: false,
+        why: 'output mismatch',
+        detail: `--- original ---\n${r1.out}\n--- decompiled ---\n${r2.out}`,
+        sources,
+      };
+    }
+
+    if (fx.assertionsDisabled) {
+      const disabledOriginal = java(join(work, 'orig'), mainCls, [], '-da');
+      const disabledRecovered = java(join(work, 'rt'), mainCls, [], '-da');
+      if (
+        disabledOriginal.code !== 0 ||
+        disabledRecovered.code !== 0 ||
+        disabledOriginal.out !== disabledRecovered.out
+      )
+        return {
+          ok: false,
+          why: 'assertions-disabled behavior mismatch',
+          detail: `${disabledOriginal.out}\n${disabledRecovered.out}`,
+        };
+    }
   }
 
   const bad = sources.filter((s) => s.source.includes('DECOMPILATION FAILED'));

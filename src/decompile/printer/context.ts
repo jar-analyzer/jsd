@@ -9,7 +9,6 @@ import type { ScopeContext } from '../java/scope.js';
 import { BinOp, Stmt, Expr } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import type { Ctx } from '../context.js';
-import { decodeBytecode } from '../../bytecode/decode.js';
 import { renderStmts as renderStmtsInner } from './stmt.js';
 
 export const PREC = {
@@ -96,55 +95,6 @@ export function renderBlock(stmts: Stmt[], rc: RenderCtx, indent: number): strin
   } finally {
     rc.scopes.pop();
   }
-}
-
-const accessorCache = new WeakMap<
-  object,
-  Map<string, { kind: 'get' | 'set'; field: string } | null>
->();
-
-export function resolveAccessor(
-  rc: RenderCtx,
-  owner: string,
-  name: string,
-): { kind: 'get' | 'set'; field: string } | null {
-  if (!/^access\$\d+$/.test(name)) return null;
-  const cf = rc.ctx.lookup(owner);
-  if (!cf) return null;
-  let cache = accessorCache.get(rc.ctx);
-  if (!cache) {
-    cache = new Map();
-    accessorCache.set(rc.ctx, cache);
-  }
-  const key = owner + '#' + name;
-  if (cache.has(key)) return cache.get(key)!;
-  const m = cf.methods.find((mm) => mm.name === name && mm.access & 0x1000);
-  let result: { kind: 'get' | 'set'; field: string } | null = null;
-  if (m?.code) {
-    try {
-      const ins = decodeBytecode(m.code.code);
-      if (
-        ins.length === 3 &&
-        ins[0].name === 'aload_0' &&
-        ins[1].name === 'getfield' &&
-        /return$/.test(ins[2].name)
-      ) {
-        result = { kind: 'get', field: cf.cp.memberRef(ins[1].cpIndex!).name };
-      } else if (
-        ins.length === 4 &&
-        ins[0].name === 'aload_0' &&
-        /^(i|l|f|d|a)load(_\d+)?$/.test(ins[1].name) &&
-        ins[2].name === 'putfield' &&
-        ins[3].name === 'return'
-      ) {
-        result = { kind: 'set', field: cf.cp.memberRef(ins[2].cpIndex!).name };
-      }
-    } catch {
-      result = null;
-    }
-  }
-  cache.set(key, result);
-  return result;
 }
 
 export function resolve(internal: string, rc: RenderCtx): string {

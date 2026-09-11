@@ -1,3 +1,4 @@
+import { recoverInnerAccessor } from '../accessors.js';
 import { annotatedType, hasTypeAnnotations } from '../type-annotations.js';
 import { formatJavaBinary, formatJavaCall, indentJava } from './layout.js';
 import { prepareExpression, sameRawReferenceType } from '../java/expressions.js';
@@ -13,7 +14,6 @@ import {
   lookupDeclared,
   renderBlock,
   resolve,
-  resolveAccessor,
   outerOf,
 } from './context.js';
 import { typeStr, memberTypeStr, nestedDisplay, simpleOf } from './types.js';
@@ -126,13 +126,13 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       const methodName = typeArgs + e.name;
       const args = e.args.map((a) => exprStr(a, rc, PREC.lambda));
       if (e.mode === 'static') {
-        const acc = resolveAccessor(rc, e.owner, e.name);
-        if (acc) {
-          const tgt = e.args[0] ? exprStr(e.args[0], rc, PREC.postfix) : '?';
-          if (acc.kind === 'get') return [`${tgt}.${acc.field}`, PREC.postfix];
-          const val = e.args[1] ? exprStr(e.args[1], rc, PREC.assign) : '?';
-          return [`${tgt}.${acc.field} = ${val}`, PREC.assign];
-        }
+        const cls = rc.ctx.lookup(e.owner);
+        const method = cls?.methods.find(
+          (method) => method.name === e.name && method.descriptor === e.descriptor,
+        );
+        const recovered =
+          cls && method ? recoverInnerAccessor(rc.ctx, cls, method, e.args) : undefined;
+        if (recovered) return exprPrec(prepareExpression(recovered, rc.ctx), rc);
         if (e.owner === rc.className)
           return [
             formatJavaCall(

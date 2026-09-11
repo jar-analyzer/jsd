@@ -1,3 +1,4 @@
+import { renderInitializer } from './initializer.js';
 import { annotatedType, declarationAnnotations } from '../type-annotations.js';
 import { annotationStr } from './annotations.js';
 import { enclosingClass, isAnonymousClass } from '../../classfile/names.js';
@@ -11,26 +12,6 @@ import { decompileMethod } from '../method.js';
 import { RenderCtx, renderStmts, renderStmtsHeader, typeStr } from '../printer/index.js';
 import { buildMethodSig, ctorHasOuterParam, safeSig, typeParamStr } from './methodsig.js';
 import type { ClassGenerator } from './index.js';
-
-function renderInitializer(stmts: Stmt[], rc: RenderCtx, isStatic: boolean): string[] {
-  const body = structuredClone(stmts);
-  const labels = new Set<string>();
-  let hasReturn = false;
-  for (const stmt of body)
-    walkStmt(stmt, (node) => {
-      if ('label' in node && node.label) labels.add(node.label);
-      if (node.kind === 'return') hasReturn = true;
-    });
-  const opening = isStatic ? 'static {' : '{';
-  if (!hasReturn) return ['', opening, ...renderStmts(body, rc, 1), '}'];
-  let label = 'initialize';
-  while (labels.has(label)) label += '$';
-  for (const stmt of body)
-    walkStmt(stmt, (node) => {
-      if (node.kind === 'return') Object.assign(node, { kind: 'break', label });
-    });
-  return ['', opening, `    ${label}: {`, ...renderStmts(body, rc, 2), '    }', '}'];
-}
 
 export const anonPart: ThisType<ClassGenerator> &
   Pick<ClassGenerator, 'buildAnonInfo' | 'methodRenderCtxFor' | 'methodHeaderFor'> = {

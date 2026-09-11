@@ -1,3 +1,5 @@
+import { renderInitializer } from './initializer.js';
+import { recoverInnerAccessor } from '../accessors.js';
 import { annotatedType, declarationAnnotations } from '../type-annotations.js';
 import { javaLiteral } from '../printer/literals.js';
 import { Stmt, walkStmt } from '../../ast/ast.js';
@@ -156,6 +158,8 @@ export const membersPart: ThisType<ClassGenerator> &
     if (m.name === '<clinit>') return false;
     const a = m.access;
     const synthetic = m.synthetic || (a & Acc.Synthetic) !== 0;
+    if (synthetic && m.name.startsWith('access$'))
+      return recoverInnerAccessor(this.ctx, this.cls, m) !== undefined;
     if (synthetic && m.name.startsWith('lambda$')) return true;
     if (synthetic && this.isEnum && m.name === '<init>') return true;
     if (
@@ -166,13 +170,11 @@ export const membersPart: ThisType<ClassGenerator> &
       return true;
     if ((a & Acc.Bridge) !== 0 || m.synthetic) {
       if (m.name.startsWith('lambda$')) return true;
-      if (m.name.startsWith('access$')) return true;
       if (m.name.startsWith('$SWITCH_TABLE$')) return true;
       if ((a & Acc.Bridge) !== 0) return true;
       if (m.synthetic && m.name !== '<init>') return true;
     }
-    if (synthetic && (m.name.startsWith('access$') || m.name.startsWith('$SWITCH_TABLE$')))
-      return true;
+    if (synthetic && m.name.startsWith('$SWITCH_TABLE$')) return true;
     if (this.isEnum && (m.name === 'values' || m.name === 'valueOf') && a & Acc.Static) {
       if (m.name === 'values' && m.descriptor === '()[L' + this.cls.name + ';') return true;
       if (m.name === 'valueOf' && m.descriptor === `(Ljava/lang/String;)L${this.cls.name};`)
@@ -201,9 +203,9 @@ export const membersPart: ThisType<ClassGenerator> &
       if (!stmts.length) return;
       const clrc = this.methodRenderCtx(m);
       clrc.scopes.push(new Map());
-      this.out.push('    static {');
-      this.out.push(...renderStmts(stmts, clrc, 2));
-      this.out.push('    }');
+      this.out.push(
+        ...renderInitializer(stmts, clrc, true).map((line) => (line ? '    ' + line : '')),
+      );
       this.out.push('');
       return;
     }

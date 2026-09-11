@@ -12,7 +12,7 @@
 
 TypeScript 实现的 Java `.class` 反编译库，支持 Node.js 和浏览器。
 
-**单个 ESM 文件约 274 KB，gzip 后约 84 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
+**单个 ESM 文件约 277 KB，gzip 后约 85 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
 
 支持常见控制流、lambda、嵌套类、record 及 Java 25 的部分语法。将作为下一代 **jar-analyzer** 的反编译引擎。
 
@@ -57,31 +57,27 @@ const result = decompileClassFile(readFileSync('Example.class'));
 console.log(result.source);
 ```
 
-### 3. 输入限制
-
-默认不限制输入大小。以下配置将单个 `.class` 文件限制为 10 MB：
-
-```js
-const result = decompileClassFile(data, { maxInputBytes: 10 * 1000 * 1000 });
-```
-
-文件超限时抛出错误；批量处理记录错误并继续处理其他文件。
-
-其他可选限制：`maxTotalInputBytes`（批量总大小）、`maxClasses`（类数量）、`maxOutputChars`（输出字符数）、`maxWork`（工作量）、`timeoutMs`（耗时）。
-
 ## 测试
 
-| 分类      | 覆盖内容                                                              | CI 环境                                      |
-| --------- | --------------------------------------------------------------------- | -------------------------------------------- |
-| 质量检查  | 格式、类型、浏览器产物及文档体积数据一致性                            | Node.js 24                                   |
-| 单元测试  | 314 个引擎、Demo 与工具用例                                           | Node.js 24                                   |
-| Java 往返 | 168 个用例，覆盖求值顺序、控制流、异常和资源管理                      | JDK 8、11、17、21、25；无调试信息：8、17、25 |
-| 现代 Java | 最多 18 个 Java 9–25 用例，覆盖有、无调试信息两种模式                 | JDK 21、25                                   |
-| 字节码    | 最多 37 个动态字节码用例、9 个值语义校验、17 个畸形 class 的 JVM 校验 | JDK 11、17、21、25                           |
-| 安装包    | 安装、类型声明、ESM、公开 API、许可证                                 | Node.js 20、24                               |
-| 模糊测试  | 2,000 轮固定种子字节码变异                                            | Node.js 24、JDK 25                           |
+| 测试              | 用例数 | CI 环境             |
+| ----------------- | -----: | ------------------- |
+| 格式              |      — | Node.js 24          |
+| 类型              |      — | Node.js 24          |
+| 产物与体积        |      — | Node.js 24          |
+| 单元测试          |    314 | Node.js 24          |
+| Java 往返：带调试 |    172 | JDK 8/11/17/21/25   |
+| Java 往返：无调试 |    172 | JDK 8/17/25         |
+| Java 9–25：带调试 |    ≤18 | JDK 21/25           |
+| Java 9–25：无调试 |    ≤18 | JDK 21/25           |
+| 动态字节码        |    ≤37 | JDK 11/17/21/25     |
+| 值语义            |      9 | JDK 11/17/21/25     |
+| 畸形 class        |     17 | JDK 11/17/21/25     |
+| 安装包            |      — | Node.js 20/24       |
+| 模糊测试          |  2,000 | Node.js 24 + JDK 25 |
 
-修改引擎后，运行 `npm run sync` 重新构建浏览器 demo，并同步双语 README 和 demo 的体积数据。使用 `npm run docs:check` 校验它们与当前构建一致。
+旧版用例同时验证反编译源码按原目标版本及当前 JDK 目标版本重编译后的行为。
+
+JDK 8 验证 Java 6/7 目标；较新 JDK 必要时使用其支持的最低目标版本。
 
 ## 许可证
 

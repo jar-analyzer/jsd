@@ -9,6 +9,9 @@ changelog:
 - Improve Java formatting and reduce redundant casts and locals.
 - Preserve evaluation order, local values, scopes and short-circuit operands.
 - Preserve external primitive field writes and dollar signs in class names.
+- Restore legacy private-access bridges and class initialization semantics.
+- Fix conditional exits from static initializers.
+- Preserve builder string identity and null append overloads.
 - Fix lambda captures, nested lambdas and primitive method references.
 - Correct reference, array and generic type recovery.
 - Preserve resource exception handlers.
@@ -24,6 +27,9 @@ changelog:
 - 改善 Java 格式，减少冗余转换和局部变量。
 - 保留求值顺序、局部变量值、作用域和短路操作数。
 - 保留外部基本类型字段写入和类名中的 $ 符号。
+- 恢复旧版私有访问桥接，保留类初始化语义。
+- 修复静态初始化器中的条件退出。
+- 保留字符串构建器的结果身份和 null 追加重载。
 - 修复 lambda 捕获、嵌套 lambda 和基本类型方法引用。
 - 修正引用、数组和泛型类型恢复。
 - 保留资源管理中的异常处理分支。
