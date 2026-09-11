@@ -266,6 +266,8 @@ export class Simulator {
       throw new SimFail(`${(e as Error).message}`);
     }
     const term = this.makeTerminator(b, stack, id);
+    if (term.t === 'if' || term.t === 'switch')
+      this.snapshotWrite(stack, stmts, b.instrs[b.instrs.length - 1].pc);
     this.sim.stmts[id] = stmts;
     this.sim.terms[id] = term;
     this.stackOut[id] = stack;

@@ -23,6 +23,21 @@ export function applyCodeTypeAnnotations(
     walkStmtExprs(stmt, (expr) => expressions.add(expr));
     walkStmt(stmt, (child) => statements.add(child));
   }
+  const expectedTypes = new Map<Expr, JType>();
+  const signature = method.signature
+    ? parseSignature(method.signature)
+    : parseMethodDescriptor(method.descriptor);
+  const returnType =
+    'kind' in signature ? parseMethodDescriptor(method.descriptor).ret : signature.ret;
+  for (const stmt of statements) {
+    if (stmt.kind === 'return' && stmt.expr) expectedTypes.set(stmt.expr, returnType);
+    if (stmt.kind === 'local-decl' && stmt.init) expectedTypes.set(stmt.init, stmt.jtype);
+  }
+  for (const expr of expressions) {
+    if (expr.kind === 'assign-expr' && 'jtype' in expr.target && expr.target.jtype)
+      expectedTypes.set(expr.expr, expr.target.jtype);
+    if (expr.kind === 'cast') expectedTypes.set(expr.expr, expectedTypes.get(expr) ?? expr.jtype);
+  }
   const ordered = [...expressions].sort(
     (a, b) => (a.bytecodeOffset ?? -1) - (b.bytecodeOffset ?? -1),
   );
@@ -174,6 +189,14 @@ export function applyCodeTypeAnnotations(
         }
         if (expr) {
           if (expr.kind === 'cast') {
+            const expected = expectedTypes.get(expr);
+            if (
+              expr.jtype.kind === 'class' &&
+              expected?.kind === 'class' &&
+              expr.jtype.name === expected.name &&
+              !expr.jtype.args?.length
+            )
+              expr.jtype = expected;
             if (entry.typeArgumentIndex !== 0 || expr.intersectionTypes) {
               if (!expr.intersectionTypes) {
                 expr.intersectionTypes = [];
@@ -239,7 +262,13 @@ export function applyCodeTypeAnnotations(
               ctx,
             );
           } else if (entry.targetType >= 0x48) {
-            expr.typeArguments = recoverTypeArguments(ctx, cls, expr, entry);
+            expr.typeArguments = recoverTypeArguments(
+              ctx,
+              cls,
+              expr,
+              entry,
+              expectedTypes.get(expr),
+            );
           } else throw new Error('Missing annotated expression');
           applied = true;
         }
@@ -266,6 +295,7 @@ function recoverTypeArguments(
   cls: ClassFile,
   expr: Expr,
   entry: TypeAnnotation,
+  expected?: JType,
 ): JType[] {
   if (expr.kind !== 'new' && expr.kind !== 'invoke' && expr.kind !== 'method-ref')
     throw new Error('Missing generic invocation');
@@ -282,8 +312,10 @@ function recoverTypeArguments(
     const instantiated = cls.bootstrapMethods[expr.bootstrap.index].args[2];
     if (instantiated?.kind === 'methodType') {
       const signature = parseSignature(instantiated.descriptor);
-      if (!('kind' in signature))
+      if (!('kind' in signature)) {
         args = signature.params.map((jtype) => ({ kind: 'raw', text: '', jtype }));
+        expected = signature.ret;
+      }
     }
   }
   const method = descriptor ? ctx.methodInfo(owner, name, descriptor)?.m : undefined;
@@ -292,8 +324,26 @@ function recoverTypeArguments(
   if ('kind' in signature) throw new Error('Missing generic method signature');
   const inferred = new Map<string, JType>();
   const bind = (formal: JType, actual: JType): void => {
-    if (formal.kind === 'typevar') inferred.set(formal.name, actual);
-    else if (formal.kind === 'array' && actual.kind === 'array') bind(formal.elem, actual.elem);
+    if (formal.kind === 'typevar') {
+      const previous = inferred.get(formal.name);
+      if (!previous || JSON.stringify(previous) === JSON.stringify(actual))
+        inferred.set(formal.name, actual);
+      else {
+        const numeric = ['Byte', 'Short', 'Integer', 'Long', 'Float', 'Double', 'Number'].map(
+          (n) => 'java/lang/' + n,
+        );
+        inferred.set(formal.name, {
+          kind: 'class',
+          name:
+            previous.kind === 'class' &&
+            actual.kind === 'class' &&
+            numeric.includes(previous.name) &&
+            numeric.includes(actual.name)
+              ? 'java/lang/Number'
+              : 'java/lang/Object',
+        });
+      }
+    } else if (formal.kind === 'array' && actual.kind === 'array') bind(formal.elem, actual.elem);
     else if (formal.kind === 'class' && actual.kind === 'class')
       formal.args?.forEach((arg, i) => {
         if (actual.args?.[i]) bind(arg, actual.args[i]);
@@ -303,6 +353,7 @@ function recoverTypeArguments(
     const actual = args[i] && expressionType(args[i]);
     if (actual) bind(formal, actual);
   });
+  if (expected) bind(signature.ret, expected);
   const types =
     expr.typeArguments ??
     signature.typeParams.map((param) => {

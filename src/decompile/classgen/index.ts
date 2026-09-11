@@ -1,4 +1,4 @@
-import { annotatedType, annotatedTypeParams } from '../type-annotations.js';
+import { declarationAnnotations, annotatedType, annotatedTypeParams } from '../type-annotations.js';
 import { formatJavaSource } from '../format/index.js';
 import { OutputLines } from '../budget.js';
 import type { AnonInfo } from '../printer/context.js';
@@ -319,10 +319,10 @@ export class ClassGenerator {
     const isEnumCls = (a & Acc.Enum) !== 0;
     if (a & Acc.Public) mods.push('public');
     if (a & Acc.Final && !isEnumCls) mods.push('final');
-    if (a & Acc.Abstract) mods.push('abstract');
+    if (a & Acc.Abstract && !isEnumCls) mods.push('abstract');
     if (a & Acc.Static && !this.standalone && !isEnumCls) mods.push('static');
     if (a & Acc.Strict) mods.push('strictfp');
-    if (this.cls.permitted.length) mods.push('sealed');
+    if (this.cls.permitted.length && !isEnumCls) mods.push('sealed');
     else if (
       !(a & Acc.Final) &&
       !isEnumCls &&
@@ -371,7 +371,18 @@ export class ClassGenerator {
     if (this.isRecord) {
       const comps = this.cls.recordComponents.map((c) => {
         const t = sigType(c.signature) ?? parseFieldDescriptor(c.descriptor);
-        return `${this.renderType(annotatedType(t, c.typeAnnotations, this.ctx))} ${c.name}`;
+        const field = this.cls.fields.find((f) => f.name === c.name);
+        const annotations = [...c.annotations, ...(field?.annotations ?? [])];
+        const rendered = [
+          ...new Set(
+            declarationAnnotations(annotations, c.typeAnnotations, 0x13).map((a) =>
+              annotationStr(a, this),
+            ),
+          ),
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return `${rendered ? rendered + ' ' : ''}${this.renderType(annotatedType(t, c.typeAnnotations, this.ctx))} ${c.name}`;
       });
       header += `(${comps.join(', ')})`;
     }
@@ -416,7 +427,7 @@ export class ClassGenerator {
           })
           .join(', ');
     }
-    if (this.cls.permitted.length) {
+    if (this.cls.permitted.length && !isEnumCls) {
       header += ' permits ' + this.cls.permitted.map((i) => this.resolve(i)).join(', ');
     }
     return header;

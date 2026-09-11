@@ -29,7 +29,7 @@ export function charLiteral(value: number): string {
   return `'${escapeString(String.fromCharCode(value), "'")}'`;
 }
 
-export function javaLiteral(kind: string, value: unknown): string {
+export function javaLiteral(kind: string, value: unknown, rawBits?: number): string {
   switch (kind) {
     case 'string':
       return `"${escapeString(String(value))}"`;
@@ -45,6 +45,8 @@ export function javaLiteral(kind: string, value: unknown): string {
     case 'double': {
       const v = Number(value);
       const owner = kind === 'float' ? 'java.lang.Float' : 'java.lang.Double';
+      if (kind === 'float' && Number.isNaN(v) && rawBits !== undefined && rawBits !== 0x7fc00000)
+        return `java.lang.Float.intBitsToFloat(0x${rawBits.toString(16)})`;
       if (Number.isNaN(v)) return `${owner}.NaN`;
       if (v === Infinity) return `${owner}.POSITIVE_INFINITY`;
       if (v === -Infinity) return `${owner}.NEGATIVE_INFINITY`;

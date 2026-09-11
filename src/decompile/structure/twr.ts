@@ -119,9 +119,9 @@ export function detectTwr(
       g2.consumedHandlers.add(hh.handlerPc);
       const hbb = state.blockOfPc(hh.handlerPc);
       if (hbb >= 0) {
+        const region = state.dfsCollect(hbb, nodes, new Set<number>(), state.claimedSet());
         state.claimed[hbb] = true;
-        for (const x of state.dfsCollect(hbb, nodes, new Set<number>(), state.claimedSet()))
-          state.claimed[x] = true;
+        for (const x of region) state.claimed[x] = true;
       }
     }
   }
@@ -151,9 +151,9 @@ export function detectTwr(
         g2.consumedHandlers.add(hh.handlerPc);
         const hbb = state.blockOfPc(hh.handlerPc);
         if (hbb >= 0) {
+          const region = state.dfsCollect(hbb, nodes, new Set<number>(), state.claimedSet());
           state.claimed[hbb] = true;
-          for (const x of state.dfsCollect(hbb, nodes, new Set<number>(), state.claimedSet()))
-            state.claimed[x] = true;
+          for (const x of region) state.claimed[x] = true;
         }
       }
     }
@@ -260,7 +260,7 @@ export function detectTwr(
         implicitEnds: new Set(),
         breakables: [],
       });
-      catches.push({ type: hh.catchType, body: cbody, varName, varSlot });
+      catches.push({ type: hh.catchType ?? 'java/lang/Throwable', body: cbody, varName, varSlot });
     }
   }
 

@@ -24,7 +24,7 @@ const TAG = {
 type CpEntry =
   | { tag: 1; str: string }
   | { tag: 3; int: number }
-  | { tag: 4; float: number }
+  | { tag: 4; float: number; rawBits: number }
   | { tag: 5; long: bigint }
   | { tag: 6; double: number }
   | { tag: 7; nameIdx: number }
@@ -65,10 +65,13 @@ export class ConstantPool {
           this.entries[i] = { tag: 3, int: r.s4() };
           i++;
           break;
-        case TAG.Float:
-          this.entries[i] = { tag: 4, float: bitsToF32(r.bytes(4)) };
+        case TAG.Float: {
+          const bytes = r.bytes(4);
+          const rawBits = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, false);
+          this.entries[i] = { tag: 4, float: bitsToF32(bytes), rawBits };
           i++;
           break;
+        }
         case TAG.Long: {
           const hi = r.u4() >>> 0;
           const lo = r.u4() >>> 0;
@@ -187,13 +190,17 @@ export class ConstantPool {
     const nat = this.nat(x.natIdx);
     return { bsm: x.bsmIdx, name: nat.name, descriptor: nat.descriptor };
   }
-  constVal(i: number): { type: string; value: number | string | bigint | boolean | undefined } {
+  constVal(i: number): {
+    rawBits?: number;
+    type: string;
+    value: number | string | bigint | boolean | undefined;
+  } {
     const x = this.e(i);
     switch (x.tag) {
       case 3:
         return { type: 'int', value: x.int };
       case 4:
-        return { type: 'float', value: x.float };
+        return { type: 'float', value: x.float, rawBits: x.rawBits };
       case 5:
         return { type: 'long', value: x.long };
       case 6:

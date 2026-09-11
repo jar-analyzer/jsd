@@ -1,3 +1,4 @@
+import { expressionType } from '../../ast/types.js';
 import { localUses } from './local-uses.js';
 import { Expr, Stmt } from '../../ast/ast.js';
 import { JType, parseMethodDescriptor } from '../../classfile/types.js';
@@ -49,6 +50,20 @@ function tryFoldTernaryAt(s: Stmt, rest: Stmt[], bctx?: BoolFoldCtx): TernaryFol
   void tName;
   const writes = countSlotUses(rest, eSlot);
   if (writes.writes !== 0 || writes.reads !== 1) return null;
+  const tt = expressionType(tExpr),
+    et = expressionType(eExpr);
+  const numericWrapper = (t: JType | undefined): boolean =>
+    t?.kind === 'class' &&
+    ['Byte', 'Short', 'Character', 'Integer', 'Long', 'Float', 'Double'].some(
+      (name) => t.name === 'java/lang/' + name,
+    );
+  if (
+    tt &&
+    et &&
+    (numericWrapper(tt) || numericWrapper(et)) &&
+    JSON.stringify(tt) !== JSON.stringify(et)
+  )
+    return null;
   const ternary: Expr = { kind: 'ternary', cond: s.cond, thenE: tExpr, elseE: eExpr };
   let form = ternaryToBool(ternary);
   if (!form && bctx) {

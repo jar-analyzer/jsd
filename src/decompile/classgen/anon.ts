@@ -79,7 +79,16 @@ export const anonPart: ThisType<ClassGenerator> &
             continue;
           if (expr.kind === 'invoke' && expr.name === '<init>' && expr.superCall) {
             beforeSuper = false;
+            const superConstructor = this.ctx.methodInfo(expr.owner, '<init>', expr.descriptor)?.m;
             for (const arg of expr.args) {
+              if (
+                cf.access & Acc.Enum &&
+                superConstructor &&
+                (superConstructor.synthetic || superConstructor.access & Acc.Synthetic) &&
+                arg.kind === 'const' &&
+                arg.ctype === 'null'
+              )
+                continue;
               if (arg.kind !== 'local' || !slots.has(arg.slot))
                 throw new Error(`Unsupported anonymous superclass argument: ${cf.name}`);
               superArgIndices.push(slots.get(arg.slot)!);

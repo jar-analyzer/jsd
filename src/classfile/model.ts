@@ -126,7 +126,11 @@ export interface FieldInfo {
   name: string;
   descriptor: string;
   signature?: string;
-  constantValue?: { tag: string; value: number | bigint | string | boolean | undefined };
+  constantValue?: {
+    rawBits?: number;
+    tag: string;
+    value: number | bigint | string | boolean | undefined;
+  };
   annotations: Ann[];
   synthetic: boolean;
   deprecated: boolean;

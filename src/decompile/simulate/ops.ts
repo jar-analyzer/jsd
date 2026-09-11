@@ -235,7 +235,15 @@ export const opsPart: ThisType<Simulator> &
     if (nm in binOps) {
       const r = stack.pop(),
         l = stack.pop();
-      const t = arithType(nm);
+      const booleanOperands =
+        ['iand', 'ior', 'ixor'].includes(nm) &&
+        [l, r].every((e) => {
+          const t = expressionType(e);
+          return t?.kind === 'prim' && t.name === 'boolean';
+        });
+      const t = booleanOperands
+        ? { kind: 'prim' as const, name: 'boolean' as const }
+        : arithType(nm);
       const wide = !!t && t.kind === 'prim' && (t.name === 'long' || t.name === 'double');
       if (binOps[nm] === '^' && r.kind === 'const' && r.ctype === 'int' && r.value === -1) {
         stack.push({ kind: 'unary', op: '~', operand: l, jtype: t });
@@ -290,6 +298,7 @@ export const opsPart: ThisType<Simulator> &
           }
         }
       }
+      this.snapshotWrite(stack, stmts, ins.pc, slot);
       let expr: Expr;
       if (d === 1) expr = { kind: 'unary', op: 'x++', operand: lv };
       else if (d === -1) expr = { kind: 'unary', op: 'x--', operand: lv };
@@ -703,7 +712,12 @@ export const opsPart: ThisType<Simulator> &
           stack.push({ kind: 'const', ctype: 'int', value: cv.value as number });
           break;
         case 'float':
-          stack.push({ kind: 'const', ctype: 'float', value: cv.value as number });
+          stack.push({
+            kind: 'const',
+            ctype: 'float',
+            value: cv.value as number,
+            rawBits: cv.rawBits,
+          });
           break;
         case 'long':
           stack.push({ kind: 'const', ctype: 'long', value: cv.value as bigint }, true);

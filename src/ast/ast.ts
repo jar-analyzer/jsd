@@ -8,6 +8,7 @@ export type Expr = (
   | {
       kind: 'const';
       ctype: ConstKind;
+      rawBits?: number;
       value: number | bigint | string | boolean | undefined;
       jtype?: JType;
     }
@@ -194,7 +195,11 @@ export function exprEq(a: Expr | undefined, b: Expr | undefined): boolean {
     case 'super':
       return true;
     case 'const':
-      return a.ctype === (b as typeof a).ctype && Object.is(a.value, (b as typeof a).value);
+      return (
+        a.ctype === (b as typeof a).ctype &&
+        a.rawBits === (b as typeof a).rawBits &&
+        Object.is(a.value, (b as typeof a).value)
+      );
     case 'binary': {
       const bb = b as typeof a;
       return (

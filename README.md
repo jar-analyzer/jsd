@@ -12,7 +12,7 @@
 
 A TypeScript Java `.class` decompiler for Node.js and browsers.
 
-**Single ESM bundle: approximately 252 KB, or 77 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
+**Single ESM bundle: approximately 274 KB, or 84 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
 
 Supports common control flow, lambdas, nested classes, records and selected Java features through Java 25. Intended as the decompilation engine for the next generation of **jar-analyzer**.
 
@@ -71,15 +71,17 @@ Other optional limits: `maxTotalInputBytes` (batch size), `maxClasses` (class co
 
 ## Testing
 
-| Suite           | Coverage                                                            | CI environment                             |
-| --------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| Quality         | Formatting and types; CI also checks browser bundle consistency     | Node.js 24                                 |
-| Unit            | 311 engine and demo cases                                           | Node.js 24                                 |
-| Java round-trip | 149 cases: evaluation order, control flow, exceptions and resources | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
-| Modern Java     | Up to 15 Java 9–25 cases, with and without debug information        | JDK 21, 25                                 |
-| Bytecode        | Up to 37 dynamic bytecode cases and 17 malformed-class JVM checks   | JDK 11, 17, 21, 25                         |
-| Package         | Installation, type declarations, ESM, public APIs and license       | Node.js 20, 24                             |
-| Fuzz            | 2,000 fixed-seed bytecode mutations                                 | Node.js 24, JDK 25                         |
+| Suite           | Coverage                                                                                 | CI environment                             |
+| --------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Quality         | Formatting, types, browser bundle and documented sizes                                   | Node.js 24                                 |
+| Unit            | 314 engine, demo and tooling cases                                                       | Node.js 24                                 |
+| Java round-trip | 168 cases: evaluation order, control flow, exceptions and resources                      | JDK 8, 11, 17, 21, 25; no-debug: 8, 17, 25 |
+| Modern Java     | Up to 18 Java 9–25 cases, with and without debug information                             | JDK 21, 25                                 |
+| Bytecode        | Up to 37 dynamic bytecode cases plus 9 value-semantics and 17 malformed-class JVM checks | JDK 11, 17, 21, 25                         |
+| Package         | Installation, type declarations, ESM, public APIs and license                            | Node.js 20, 24                             |
+| Fuzz            | 2,000 fixed-seed bytecode mutations                                                      | Node.js 24, JDK 25                         |
+
+After changing the engine, run `npm run sync` to rebuild the browser demo and update bundle sizes in both READMEs and the demo. `npm run docs:check` verifies they match the current build.
 
 ## License
 

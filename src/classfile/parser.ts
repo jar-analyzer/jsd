@@ -235,7 +235,11 @@ export function parseClass(data: Uint8Array, checkName?: (name: string) => void)
       switch (at.name) {
         case 'ConstantValue': {
           const cv = cp.constVal(d.u2());
-          f.constantValue = { tag: cv.type, value: cv.value };
+          f.constantValue = {
+            tag: cv.type,
+            value: cv.value,
+            ...(cv.rawBits !== undefined ? { rawBits: cv.rawBits } : {}),
+          };
           break;
         }
         case 'Signature':

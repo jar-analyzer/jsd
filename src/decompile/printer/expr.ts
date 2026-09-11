@@ -56,7 +56,7 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
       return [name, PREC.postfix];
     }
     case 'const': {
-      const literal = javaLiteral(e.ctype, e.value);
+      const literal = javaLiteral(e.ctype, e.value, e.rawBits);
       return [literal, literal.startsWith('-') ? PREC.unary : PREC.postfix];
     }
     case 'class-literal':

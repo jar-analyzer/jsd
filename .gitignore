@@ -24,4 +24,4 @@ coverage/
 *.class
 *.war
 
-/plan.md
+/plan*.md

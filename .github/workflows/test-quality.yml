@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Format, types and browser bundle
+    name: Format, types, bundle and documentation
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,4 +27,4 @@ jobs:
       - run: npm run format:check
       - run: npm run check
       - run: npm run build
-      - run: cmp dist/jsd.min.js docs/jsd.browser.js
+      - run: npm run docs:check

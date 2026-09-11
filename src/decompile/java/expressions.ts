@@ -68,6 +68,22 @@ export function prepareReturnValue(
   type?: JType,
   locals?: ReadonlyMap<number, JType>,
 ): Expr {
+  const actual = expressionType(expr, (slot) => locals?.get(slot));
+  if (
+    type?.kind === 'prim' &&
+    type.name === 'boolean' &&
+    actual?.kind === 'prim' &&
+    actual.name !== 'boolean' &&
+    !(expr.kind === 'const' && (expr.value === 0 || expr.value === 1))
+  ) {
+    expr = {
+      kind: 'binary',
+      op: '&',
+      left: expr,
+      right: { kind: 'const', ctype: 'int', value: 1 },
+      jtype: { kind: 'prim', name: 'int' },
+    };
+  }
   return type
     ? adaptPrimitiveValue(
         expr,

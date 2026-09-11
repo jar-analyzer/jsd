@@ -35,12 +35,14 @@ all: quality checks and every suite, including fuzz (JDK 25+)`);
       npm(['run', 'check']);
     }
     if (suite !== 'unit') npm(['run', 'build']);
+    if (suite === 'all') npm(['run', 'docs:check']);
     const unit = (filters = []) => script('unit/run.mjs', filters);
     const roundtrip = (options = []) => script('roundtrip/core.mjs', options);
     const modern = (options = []) => script('roundtrip/modern.mjs', ['--require-all', ...options]);
     const bytecode = () => {
       script('bytecode/dynamic.mjs');
       script('bytecode/validation.mjs');
+      script('bytecode/correctness.mjs');
     };
     if (suite === 'unit') unit(args);
     else if (suite === 'roundtrip') roundtrip(args);

@@ -182,7 +182,11 @@ export function detectTwr8(
   }
   for (const g2 of state.rangeGroups) {
     if (g2.done) continue;
-    if (g2.start >= h1.handlerPc && g2.end <= maxEnd) {
+    if (
+      g2.start >= h1.handlerPc &&
+      g2.end <= maxEnd &&
+      g2.handlers.every((h) => h.handlerPc >= h1.handlerPc && h.handlerPc < maxEnd)
+    ) {
       g2.done = true;
       for (const hh of g2.handlers) {
         g2.consumedHandlers.add(hh.handlerPc);

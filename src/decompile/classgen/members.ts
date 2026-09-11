@@ -15,7 +15,7 @@ import {
   markExternalForDecls,
   firstReadExpectsBoolean,
 } from '../patterns/index.js';
-import { RenderCtx, renderStmts, typeStr, simpleOf } from '../printer/index.js';
+import { RenderCtx, renderStmts, exprStr, typeStr, simpleOf } from '../printer/index.js';
 import { annotationStr, annValStr } from './annotations.js';
 import {
   buildMethodSig,
@@ -23,7 +23,6 @@ import {
   typeParamStr,
   isSyntheticField,
   innerStripCtor,
-  isCanonicalRecordCtor,
   safeIdent,
 } from './methodsig.js';
 import type { MethodSigInfo } from './methodsig.js';
@@ -95,7 +94,11 @@ export const membersPart: ThisType<ClassGenerator> &
         const names = enumConsts
           .map((f) => {
             const args = ctorArgs.get(f.name);
-            return args ? `${f.name}(${args})` : f.name;
+            const annotations = f.annotations
+              .map((a) => annotationStr(a, this))
+              .filter(Boolean)
+              .join(' ');
+            return `${annotations ? annotations + ' ' : ''}${f.name}${args ?? ''}`;
           })
           .join(', ');
         this.out.push(`    ${names};`);
@@ -154,6 +157,7 @@ export const membersPart: ThisType<ClassGenerator> &
     const a = m.access;
     const synthetic = m.synthetic || (a & Acc.Synthetic) !== 0;
     if (synthetic && m.name.startsWith('lambda$')) return true;
+    if (synthetic && this.isEnum && m.name === '<init>') return true;
     if (
       m.name === '$deserializeLambda$' &&
       m.descriptor === '(Ljava/lang/invoke/SerializedLambda;)Ljava/lang/Object;' &&
@@ -236,7 +240,32 @@ export const membersPart: ThisType<ClassGenerator> &
       return;
     }
     let stmts = body.stmts;
-    if (this.isRecord && m.name === '<init>' && isCanonicalRecordCtor(m, stmts, this.cls)) return;
+    if (m.name === '<init>' && this.cls.majorVersion >= 69) {
+      const terminates = (list: Stmt[]): boolean => {
+        const last = list[list.length - 1];
+        return (
+          last?.kind === 'throw' ||
+          (last?.kind === 'if' && !!last.elseS && terminates(last.thenS) && terminates(last.elseS))
+        );
+      };
+      const flatten = (list: Stmt[]): Stmt[] =>
+        list.flatMap((s) => {
+          if (s.kind !== 'if' || !s.elseS) return [s];
+          if (terminates(s.thenS)) return [{ ...s, elseS: undefined }, ...flatten(s.elseS)];
+          if (terminates(s.elseS))
+            return [
+              {
+                ...s,
+                cond: { kind: 'unary', op: '!', operand: s.cond },
+                thenS: s.elseS,
+                elseS: undefined,
+              } as Stmt,
+              ...flatten(s.thenS),
+            ];
+          return [s];
+        });
+      stmts = flatten(stmts);
+    }
     if (
       this.isRecord &&
       (m.name === 'toString' || m.name === 'hashCode' || m.name === 'equals') &&
@@ -285,7 +314,7 @@ export const membersPart: ThisType<ClassGenerator> &
     if (hoisted.decls.length) {
       stmts = [...hoisted.decls, ...stmts];
     }
-    if (m.name === '<init>') {
+    if (m.name === '<init>' && this.cls.majorVersion < 69) {
       const superIdx = stmts.findIndex(
         (st) =>
           st.kind === 'expr' &&
@@ -355,10 +384,18 @@ export const membersPart: ThisType<ClassGenerator> &
     if (!body || body.failed) return out;
     const mrc = this.methodRenderCtx(clinit);
     mrc.scopes.push(new Map());
-    const lines = renderStmts(body.stmts, mrc, 0);
-    for (const l of lines) {
-      const m = /\b(\w+) = new \w+\("([^"]*)", \d+(?:, (.+))?\);/.exec(l.trim());
-      if (m && m[1] === m[2]) out.set(m[1], m[3] ?? '');
+    for (const stmt of body.stmts) {
+      if (stmt.kind !== 'expr' || stmt.expr.kind !== 'assign-expr') continue;
+      const { target, expr } = stmt.expr;
+      if (target.kind !== 'field' || target.owner !== this.cls.name || expr.kind !== 'new')
+        continue;
+      const args = expr.args
+        .slice(2)
+        .map((a) => exprStr(a, mrc, 0))
+        .join(', ');
+      const anonymous = this.anonClasses.get(expr.owner);
+      const members = anonymous?.renderMembers(new Map());
+      out.set(target.name, `(${args})${members ? ` {\n${members.join('\n')}\n}` : ''}`);
     }
     return out;
   },
@@ -519,6 +556,6 @@ export const membersPart: ThisType<ClassGenerator> &
     if (!cv) return null;
     const t = parseFieldDescriptor(f.descriptor);
     const kind = t.kind === 'prim' ? t.name : cv.tag;
-    return javaLiteral(kind, kind === 'boolean' ? cv.value === 1 : cv.value);
+    return javaLiteral(kind, kind === 'boolean' ? cv.value === 1 : cv.value, cv.rawBits);
   },
 };

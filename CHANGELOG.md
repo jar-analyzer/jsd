@@ -6,32 +6,32 @@ release date:
 
 changelog:
 
-- Improve generated Java formatting.
-- Reduce redundant casts in fluent calls.
-- Remove unused compiler-generated locals.
-- Improve local-variable usage and scope recovery.
-- Preserve short-circuit branches.
-- Preserve external primitive field assignments.
-- Preserve dollar signs in class names.
-- Restore Java type-use annotations.
-- Handle JDK 8 type annotation offsets.
-- Preserve annotations on inner class creation.
+- Improve Java formatting and reduce redundant casts and locals.
+- Preserve evaluation order, local values, scopes and short-circuit operands.
+- Preserve external primitive field writes and dollar signs in class names.
+- Fix lambda captures, nested lambdas and primitive method references.
+- Correct reference, array and generic type recovery.
+- Preserve resource exception handlers.
+- Restore enum, record and type-use annotations, including JDK 8 inputs.
+- Preserve Java 25 constructor prologues and enum constant bodies.
+- Preserve boolean narrowing and float NaN payloads.
 - Report duplicate class replacements.
+- Synchronize demo and bilingual size data with CI checks.
 - Expand regression coverage.
 
 更新内容:
 
-- 改善生成的 Java 代码格式。
-- 减少链式调用中的冗余类型转换。
-- 移除编译器生成的未使用局部变量。
-- 改善局部变量使用和作用域的恢复。
-- 保留短路分支。
-- 保留对外部类基本类型字段的赋值。
-- 保留类名中的 $ 符号。
-- 恢复 Java 类型使用注解。
-- 兼容 JDK 8 类型注解位置。
-- 保留内部类创建时的注解。
+- 改善 Java 格式，减少冗余转换和局部变量。
+- 保留求值顺序、局部变量值、作用域和短路操作数。
+- 保留外部基本类型字段写入和类名中的 $ 符号。
+- 修复 lambda 捕获、嵌套 lambda 和基本类型方法引用。
+- 修正引用、数组和泛型类型恢复。
+- 保留资源管理中的异常处理分支。
+- 恢复枚举、record 和类型使用注解，兼容 JDK 8 输入。
+- 保留 Java 25 构造器前置语句和枚举常量类体。
+- 保留 boolean 窄化和 float NaN 原始位模式。
 - 报告同名类覆盖。
+- 同步 demo 和双语体积数据，并接入 CI 校验。
 - 扩充回归测试覆盖。
 
 ## 1.1.0

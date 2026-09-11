@@ -1,6 +1,6 @@
 import { annotatedType } from './type-annotations.js';
 import { uniqueName } from './printer/context.js';
-import { Expr, Stmt } from '../ast/ast.js';
+import { Expr, Stmt, walkStmt } from '../ast/ast.js';
 import type { ClassFile, MemberRef, MethodHandleRef, MethodInfo } from '../classfile/model.js';
 import {
   parseClassSignature,
@@ -165,6 +165,19 @@ function resolveLambdaBody(e: Expr, rc: RenderCtx): string | null {
       ? body.stmts.slice(0, -1)
       : body.stmts;
   const rewritten = substitute(trimmed, subst, names, rc);
+  const nestedTarget = (value: Expr): Expr =>
+    value.kind === 'invoke' && value.owner === 'java/lang/invoke/LambdaMetafactory'
+      ? {
+          kind: 'cast',
+          jtype: parseMethodDescriptor(value.descriptor).ret,
+          expr: { ...value, erasedLambda: true },
+        }
+      : value;
+  if (e.erasedLambda)
+    for (const stmt of rewritten)
+      walkStmt(stmt, (s) => {
+        if (s.kind === 'return' && s.expr) s.expr = nestedTarget(s.expr);
+      });
   const exprBody = singleExprBody(rewritten, lambdaParamCount);
 
   const params: { name: string; jtype?: import('../classfile/types.js').JType }[] = [];
@@ -231,6 +244,15 @@ function functionalTarget(
     }
   }
   const argumentsByName: Record<string, import('../classfile/types.js').JType[]> = {
+    'java/util/function/ToIntFunction': p,
+    'java/util/function/ToLongFunction': p,
+    'java/util/function/ToDoubleFunction': p,
+    'java/util/function/ToIntBiFunction': p,
+    'java/util/function/ToLongBiFunction': p,
+    'java/util/function/ToDoubleBiFunction': p,
+    'java/util/function/IntFunction': [ret],
+    'java/util/function/LongFunction': [ret],
+    'java/util/function/DoubleFunction': [ret],
     'java/util/function/Function': [...p, ret],
     'java/util/function/BiFunction': [...p, ret],
     'java/util/function/Consumer': p,
@@ -449,6 +471,11 @@ function substitute(
         e.inner = subE(e.inner);
         return e;
       case 'assign-expr':
+        if (e.target.kind === 'field' && e.target.target) e.target.target = subE(e.target.target);
+        if (e.target.kind === 'array') {
+          e.target.array = subE(e.target.array);
+          e.target.index = subE(e.target.index);
+        }
         e.expr = subE(e.expr);
         return e;
       case 'concat':
@@ -507,6 +534,18 @@ function substitute(
       case 'sync':
         s.monitor = subE(s.monitor);
         s.body.forEach(subS);
+        break;
+      case 'try':
+        s.body.forEach(subS);
+        s.resources?.forEach((r) => {
+          if (r.init) r.init = subE(r.init);
+          r.name = uniqueName(rc, r.name);
+        });
+        s.catches.forEach((c) => c.body.forEach(subS));
+        s.finallyS?.forEach(subS);
+        break;
+      case 'label':
+        subS(s.inner);
         break;
       case 'local-decl':
         if (s.init) s.init = subE(s.init);
