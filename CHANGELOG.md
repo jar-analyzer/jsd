@@ -2,7 +2,7 @@
 
 ## 1.2.0
 
-release date:
+release date: 2026.09.12
 
 changelog:
 
