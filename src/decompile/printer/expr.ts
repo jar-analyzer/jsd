@@ -223,8 +223,15 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         let prefix = '';
         if (args.length > 0 && innerCtor.dropFirst) {
           args = args.slice(1);
-          if (first && first.kind !== 'this') {
-            prefix = `${exprStr(first, rc, PREC.postfix)}.`;
+          if (first) {
+            const outer = rc.ctx.innerClass(e.owner)?.outer;
+            const eraseOuter =
+              outer &&
+              rc.ctx.lookup(e.owner)?.signature?.startsWith('<') &&
+              !(e.annotatedType?.kind === 'class' && e.annotatedType.args?.length);
+            if (eraseOuter)
+              prefix = `${exprStr({ kind: 'cast', jtype: { kind: 'class', name: outer }, expr: first }, rc, PREC.postfix)}.`;
+            else if (first.kind !== 'this') prefix = `${exprStr(first, rc, PREC.postfix)}.`;
           }
         }
         return [

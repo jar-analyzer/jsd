@@ -437,6 +437,7 @@ export const membersPart: ThisType<ClassGenerator> &
         }
         if (a & Acc.Private) mods.push('private');
         if (a & Acc.Static) mods.push('static');
+        if (a & Acc.Strict) mods.push('strictfp');
         if (!(a & Acc.Abstract) && !(a & Acc.Static) && !(a & Acc.Private) && m.code)
           mods.push('default');
       } else {

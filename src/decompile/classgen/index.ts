@@ -203,7 +203,8 @@ export class ClassGenerator {
       this.refs.add(internal);
       const simple = simpleOf(display);
       if (/^\d+$/.test(simple)) return display;
-      if (this.ownNested.has(internal)) return simple;
+      if (this.ownNested.has(internal))
+        return this.ctx.innerClass(internal)?.outer === this.cls.name ? simple : display;
       const lc = this.localClasses.get(internal);
       if (lc) return lc.simpleName;
       const candidates = bySimple.get(simple);

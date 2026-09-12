@@ -55,9 +55,15 @@ export function buildMethodSig(ctx: Ctx, cls: ClassFile, m: MethodInfo): MethodS
     const s = safeSig(m.signature);
     if (s && !('kind' in s)) {
       const ms = s as MethodSig;
-      if (!(m.name === '<init>' && ms.params.length !== raw.params.length)) {
+      const outerPrefix =
+        m.name === '<init>' &&
+        ctorHasOuterParam(cls, m) &&
+        ms.params.length + 1 === raw.params.length
+          ? raw.params.slice(0, 1)
+          : [];
+      if (m.name !== '<init>' || ms.params.length + outerPrefix.length === raw.params.length) {
         ret = ms.ret;
-        params = ms.params.map((t) => ({ ...t }));
+        params = [...outerPrefix, ...ms.params].map((t) => ({ ...t }));
         typeParams = ms.typeParams;
         if (ms.thrown.length) thrown = ms.thrown;
       }

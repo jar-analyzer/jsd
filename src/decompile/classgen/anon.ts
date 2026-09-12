@@ -158,7 +158,7 @@ export const anonPart: ThisType<ClassGenerator> &
           )
             continue;
           const body = decompileMethod(this.ctx, cf, mm);
-          if (!body || body.failed) continue;
+          if ((!body && !(mm.access & Acc.Native)) || body?.failed) continue;
           const mrc = this.methodRenderCtxFor(cf, mm);
           mrc.fieldValues = captureValues;
           mrc.scopes.push(new Map());
@@ -170,7 +170,10 @@ export const anonPart: ThisType<ClassGenerator> &
                 annotationStr(ann, this),
               ),
             );
-            if (header) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
+            if (header) {
+              if (mm.access & Acc.Native) lines.push(header + ';');
+              else if (body) lines.push(...renderStmtsHeader(header, body.stmts, mrc));
+            }
           } catch (e) {
             if (e instanceof DecompileLimitError) throw e;
             this.ctx.diagnostics.add({
@@ -240,6 +243,11 @@ export const anonPart: ThisType<ClassGenerator> &
     const sig = buildMethodSig(this.ctx, cf, mm);
     const mods: string[] = [];
     if (mm.access & 0x0001) mods.push('public');
+    if (mm.access & Acc.Private) mods.push('private');
+    if (mm.access & Acc.Protected) mods.push('protected');
+    if (mm.access & Acc.Static) mods.push('static');
+    if (mm.access & Acc.Native) mods.push('native');
+    if (mm.access & Acc.Strict) mods.push('strictfp');
     if (mm.access & Acc.Synchronized) mods.push('synchronized');
     if (mm.access & 0x0010 && mm.name !== '<init>') mods.push('final');
     if (

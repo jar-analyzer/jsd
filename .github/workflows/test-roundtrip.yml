@@ -41,10 +41,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:roundtrip -- ${{ matrix.args }}
+      - if: matrix.java == '8' && matrix.mode == 'debug'
+        run: |
+          node test/audit/java8-correctness.mjs --source=6 Anonymous Generic InnerConstruction Nested
+          node test/audit/java8-correctness.mjs --source=7 Anonymous Generic InnerConstruction Nested
+      - if: matrix.java == '17' && matrix.mode == 'debug'
+        run: node test/audit/java8-correctness.mjs --source=8
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: roundtrip-${{ matrix.java }}-${{ matrix.mode }}
-          path: /tmp/jsd-e2e-*
+          path: |
+            /tmp/jsd-e2e-*
+            /tmp/jsd-java8-audit-*
           if-no-files-found: ignore
           retention-days: 7

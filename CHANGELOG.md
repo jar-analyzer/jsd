@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 1.3.0
+
+release date:
+
+changelog:
+
+- Preserve anonymous-class method visibility.
+- Preserve anonymous-class strictfp flags.
+- Preserve interface-method strictfp flags.
+- Preserve anonymous-class native methods.
+- Restore generic inner-class constructor signatures.
+- Fix generic inner-class construction.
+- Qualify nested member-class type names.
+
+更新内容:
+
+- 保留匿名类方法的访问权限。
+- 保留匿名类方法的 strictfp 标志。
+- 保留接口方法的 strictfp 标志。
+- 保留匿名类的 native 方法。
+- 恢复泛型内部类构造器签名。
+- 修复泛型内部类构造表达式。
+- 补全嵌套成员类类型的限定名。
+
 ## 1.2.0
 
 release date: 2026.09.12

@@ -72,8 +72,9 @@ console.log(result.source);
 | Bundle & sizes       |     — | Node.js 24          |
 | Browser layout       |     4 | Chrome/Chromium     |
 | Unit                 |   323 | Node.js 24          |
-| Round-trip: debug    |   172 | JDK 8/11/17/21/25   |
-| Round-trip: no debug |   172 | JDK 8/17/25         |
+| Round-trip: debug    |   181 | JDK 8/11/17/21/25   |
+| Round-trip: no debug |   181 | JDK 8/17/25         |
+| Legacy target checks |    50 | JDK 8/17            |
 | Java 9–25: debug     |   ≤18 | JDK 21/25           |
 | Java 9–25: no debug  |   ≤18 | JDK 21/25           |
 | Dynamic bytecode     |   ≤37 | JDK 11/17/21/25     |
