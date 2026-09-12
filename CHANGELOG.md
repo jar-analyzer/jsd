@@ -6,6 +6,9 @@ release date:
 
 changelog:
 
+- Remove redundant casts from standard collection calls.
+- Fix calls to generic collection superclass methods.
+- Preserve collection result types during overload resolution.
 - Remove redundant synthetic local copies.
 - Inline safe single-use synthetic values.
 - Remove unused temporary variables for call results.
@@ -19,6 +22,9 @@ changelog:
 
 更新内容:
 
+- 消除标准集合调用中的多余强制类型转换。
+- 修复泛型集合父类的方法调用。
+- 保留重载选择所需的集合返回值类型。
 - 消除冗余的合成局部变量复制。
 - 内联可安全合并的单次使用中间值。
 - 去除无用的调用结果临时变量。

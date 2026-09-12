@@ -1,0 +1,10 @@
+{
+  "sourcePatterns": [
+    "\\.add\\(\"first\"\\)",
+    "\\.add\\(\"-jar\"\\)",
+    "map\\.put\\(Character\\.valueOf\\('\\.'\\), new int\\[\\]",
+    "concrete\\.put\\(Character\\.valueOf\\(';'\\), new int\\[\\]",
+    "\\.offer\\(\"queued\"\\)",
+    "\\.addFirst\\(\"head\"\\)"
+  ]
+}

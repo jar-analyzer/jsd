@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import assert from 'node:assert/strict';
 import {
   mkdirSync,
   mkdtempSync,
@@ -141,6 +142,12 @@ function runOne(fx, name) {
   try {
     sources = decompileClassSet(map);
     assertGeneratedSources(sources);
+    if (existsSync(expectationPath)) {
+      const expected = JSON.parse(readFileSync(expectationPath, 'utf8'));
+      const source = sources.map((entry) => entry.source).join('\n');
+      for (const pattern of expected.sourcePatterns ?? [])
+        assert.match(source, new RegExp(pattern), `${name}: generated source pattern ${pattern}`);
+    }
   } catch (e) {
     return { ok: false, why: `decompiler crash: ${e.message}`, detail: e.stack };
   }

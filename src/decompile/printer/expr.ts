@@ -27,7 +27,7 @@ export function exprStr(
   valueRequired = true,
   enclosingCast?: JType,
 ): string {
-  const prepared = prepareExpression(e, rc.ctx);
+  const prepared = prepareExpression(e, rc.ctx, rc.className);
   let [s, p] = exprPrec(prepared, rc);
   if (
     valueRequired &&
@@ -132,7 +132,7 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         );
         const recovered =
           cls && method ? recoverInnerAccessor(rc.ctx, cls, method, e.args) : undefined;
-        if (recovered) return exprPrec(prepareExpression(recovered, rc.ctx), rc);
+        if (recovered) return exprPrec(prepareExpression(recovered, rc.ctx, rc.className), rc);
         if (e.owner === rc.className)
           return [
             formatJavaCall(

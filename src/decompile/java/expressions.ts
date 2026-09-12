@@ -3,16 +3,18 @@ import { expressionType } from '../../ast/types.js';
 import { parseMethodDescriptor, type JType } from '../../classfile/types.js';
 import type { Ctx } from '../context.js';
 import { adaptCallArgument, adaptPrimitiveValue } from '../calls.js';
+import { directCollectionCall } from '../collection-calls.js';
 
-export function prepareExpression(e: Expr, ctx: Ctx): Expr {
+export function prepareExpression(e: Expr, ctx: Ctx, currentClass?: string): Expr {
   if (e.kind === 'invoke' && !e.bootstrap) {
     const receiver = e.target ? expressionType(e.target) : undefined;
+    const directCollection = directCollectionCall(e, ctx, currentClass);
     const raw =
       receiver?.kind === 'class' &&
       !receiver.args?.length &&
       !ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
     const args = e.args.map((arg, i) =>
-      adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw, true),
+      adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw, !directCollection),
     );
     const ownerType: JType = { kind: 'class', name: e.owner };
     const rawTarget =
@@ -35,7 +37,10 @@ export function prepareExpression(e: Expr, ctx: Ctx): Expr {
     const eraseResult =
       !ctx.lookup(e.owner) &&
       ret.kind !== 'prim' &&
-      args.some((arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim');
+      (directCollection?.eraseResult ||
+        args.some(
+          (arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim',
+        ));
     return { ...e, target, args, eraseResult };
   }
   if (e.kind === 'new')

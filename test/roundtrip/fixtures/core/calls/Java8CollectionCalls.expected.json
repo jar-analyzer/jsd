@@ -1,0 +1,8 @@
+{
+  "sourcePatterns": [
+    "\\.add\\(Paths\\.get\\(",
+    "\\.putIfAbsent\\(\"key\", \"first\"\\)",
+    "\\.getOrDefault\\(\"missing\", \"default\"\\)",
+    "\\.replace\\(\"key\", \"first\", \"second\"\\)"
+  ]
+}
