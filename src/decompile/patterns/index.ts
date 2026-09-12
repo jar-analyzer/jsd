@@ -1,3 +1,4 @@
+import { simplifySyntheticLocals } from './synthetic-locals.js';
 import { removeUnusedLocals } from './unused.js';
 import { parseMethodDescriptor } from '../../classfile/types.js';
 import type { ClassFile, MethodInfo } from '../../classfile/model.js';
@@ -79,7 +80,9 @@ export function applyPatterns(
   out = foldTernary(out, sim, bctx);
   out = foldBoolTernary(out);
   for (let i = 0; i < 6; i++) {
-    const next = propagateTemps(removeUnusedLocals(out));
+    const next = simplifySyntheticLocals(propagateTemps(removeUnusedLocals(out)), (cost) =>
+      ctx.budget.check(cost),
+    );
     if (next === out) break;
     out = next;
   }

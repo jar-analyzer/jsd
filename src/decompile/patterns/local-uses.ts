@@ -1,6 +1,9 @@
 import { walkExpr, walkStmt, walkStmtExprs, type Expr, type Stmt } from '../../ast/ast.js';
 
-export function localUses(stmts: Stmt[]): Map<number, { reads: number; writes: number }> {
+export function localUses(
+  stmts: Stmt[],
+  check?: (cost: number) => void,
+): Map<number, { reads: number; writes: number }> {
   const uses = new Map<number, { reads: number; writes: number }>();
   const at = (slot: number) => {
     let use = uses.get(slot);
@@ -8,6 +11,7 @@ export function localUses(stmts: Stmt[]): Map<number, { reads: number; writes: n
     return use;
   };
   const expression = (e: Expr): void => {
+    check?.(1);
     if (e.kind === 'local') at(e.slot).reads++;
     if (e.kind === 'assign-expr') {
       const t = e.target;
@@ -37,6 +41,7 @@ export function localUses(stmts: Stmt[]): Map<number, { reads: number; writes: n
     for (const s of list) {
       walkStmtExprs(s, expression);
       walkStmt(s, (st) => {
+        check?.(1);
         if (st.kind === 'local-decl' && st.slot !== undefined) at(st.slot).writes++;
         if (st.kind === 'foreach' && st.varSlot !== undefined) at(st.varSlot).writes++;
         if (st.kind === 'try') {

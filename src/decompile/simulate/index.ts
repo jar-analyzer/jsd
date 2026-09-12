@@ -108,7 +108,7 @@ export class Simulator {
         this.sim.nextTempSlot = this.nextTempSlot;
       }
       const jtype = expressionType(item.e);
-      const local: Expr = { kind: 'local', slot, name: `dup${slot}`, jtype };
+      const local: Expr = { kind: 'local', slot, name: `dup${slot}`, jtype, temporary: true };
       if (jtype) this.ctx.recordSlotType(this.method, slot, jtype);
       stmts.push({ kind: 'expr', expr: { kind: 'assign-expr', target: local, expr: item.e } });
       replacements.set(item.e, local);
@@ -154,7 +154,7 @@ export class Simulator {
     }
     const jtype = expressionType(expr);
     if (jtype) this.ctx.recordSlotType(this.method, slot, jtype);
-    const target = { kind: 'local' as const, slot, name: `discard${slot}`, jtype };
+    const target = { kind: 'local' as const, slot, name: `discard${slot}`, jtype, temporary: true };
     stmts.push({ kind: 'expr', expr: { kind: 'assign-expr', target, expr } });
     return target;
   }

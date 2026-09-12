@@ -18,7 +18,7 @@ TypeScript 实现的 Java `.class` 反编译库，支持 Node.js 和浏览器。
 - 文件本地处理，无需后端或上传。
 - 轻松集成到 JavaScript 工具。
 
-**单个 JS 文件约 277 KB，gzip 后约 85 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
+**单个 JS 文件约 281 KB，gzip 后约 86 KB。** 无运行时依赖，无需 WebAssembly 或 Java 环境。
 
 支持常见控制流、lambda、嵌套类、record 及 Java 25 的部分语法。将作为下一代 **jar-analyzer** 的反编译引擎。
 
@@ -71,9 +71,9 @@ console.log(result.source);
 | 类型              |      — | Node.js 24          |
 | 产物与体积        |      — | Node.js 24          |
 | 浏览器布局        |      4 | Chrome/Chromium     |
-| 单元测试          |    323 | Node.js 24          |
-| Java 往返：带调试 |    181 | JDK 8/11/17/21/25   |
-| Java 往返：无调试 |    181 | JDK 8/17/25         |
+| 单元测试          |    340 | Node.js 24          |
+| Java 往返：带调试 |    183 | JDK 8/11/17/21/25   |
+| Java 往返：无调试 |    183 | JDK 8/17/25         |
 | 旧目标定向检查    |     50 | JDK 8/17            |
 | Java 9–25：带调试 |    ≤18 | JDK 21/25           |
 | Java 9–25：无调试 |    ≤18 | JDK 21/25           |

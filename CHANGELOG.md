@@ -6,6 +6,9 @@ release date:
 
 changelog:
 
+- Remove redundant synthetic local copies.
+- Inline safe single-use synthetic values.
+- Remove unused temporary variables for call results.
 - Preserve anonymous-class method visibility.
 - Preserve anonymous-class strictfp flags.
 - Preserve interface-method strictfp flags.
@@ -16,6 +19,9 @@ changelog:
 
 更新内容:
 
+- 消除冗余的合成局部变量复制。
+- 内联可安全合并的单次使用中间值。
+- 去除无用的调用结果临时变量。
 - 保留匿名类方法的访问权限。
 - 保留匿名类方法的 strictfp 标志。
 - 保留接口方法的 strictfp 标志。
