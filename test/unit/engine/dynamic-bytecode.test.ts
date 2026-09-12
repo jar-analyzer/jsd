@@ -134,7 +134,7 @@ for (const [name, constantName, descriptor, source] of [
     'enumConstant',
     'RUNNABLE',
     'Ljava/lang/Thread$State;',
-    /enumConstant\(.*"RUNNABLE", State.class\)/,
+    /\(State\) \(\(Object\) ConstantBootstraps\.enumConstant\(\s*MethodHandles\.lookup\(\),\s*"RUNNABLE",\s*State.class\s*\)\)/,
   ],
 ] as const) {
   test(`ConstantDynamic ${name}/${constantName} restores its Java expression`, () => {

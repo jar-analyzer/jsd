@@ -208,7 +208,9 @@ test('identical raw casts collapse but intervening checked and generic casts rem
     { ...type, args: [{ kind: 'class' as const, name: 'java/lang/String' }] },
   ]) {
     const output = exprStr(cast({ kind: 'cast', jtype: intermediate, expr: value }), context());
-    assert.equal((output.match(/\) /g) ?? []).length, 2);
+    const needsBridge = intermediate.name === 'example/Other';
+    assert.equal((output.match(/\) /g) ?? []).length, needsBridge ? 3 : 2);
+    assert.equal(output.includes('(java.lang.Object)'), needsBridge);
   }
 });
 

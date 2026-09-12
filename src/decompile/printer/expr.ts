@@ -3,6 +3,7 @@ import { annotatedType, hasTypeAnnotations } from '../type-annotations.js';
 import { formatJavaBinary, formatJavaCall, indentJava } from './layout.js';
 import { prepareExpression, sameRawReferenceType } from '../java/expressions.js';
 import { expressionType } from '../../ast/types.js';
+import { needsReferenceCastBridge } from '../java/reference-casts.js';
 import { initialType } from '../java/types.js';
 import { javaLiteral } from './literals.js';
 import { AssignTarget, Expr, walkExpr } from '../../ast/ast.js';
@@ -27,7 +28,7 @@ export function exprStr(
   valueRequired = true,
   enclosingCast?: JType,
 ): string {
-  const prepared = prepareExpression(e, rc.ctx, rc.className);
+  const prepared = prepareExpression(e, rc.ctx, rc.className, rc.declTypes);
   let [s, p] = exprPrec(prepared, rc);
   if (
     valueRequired &&
@@ -93,6 +94,13 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         for (let i = 0; i < e.intersectionTypes.length; i++) {
           if (operand.kind === 'cast') operand = operand.expr;
         }
+        const actual = expressionType(operand, (slot) => rc.declTypes?.get(slot));
+        if (e.intersectionTypes.some((type) => needsReferenceCastBridge(actual, type, rc.ctx)))
+          operand = {
+            kind: 'cast',
+            jtype: { kind: 'class', name: 'java/lang/Object' },
+            expr: operand,
+          };
         return [
           `(${e.intersectionTypes.map((type) => typeStr(type, rc)).join(' & ')}) ${exprStr(operand, rc, PREC.unary)}`,
           PREC.cast,
@@ -106,11 +114,30 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         sameRawReferenceType(e.jtype, operand.jtype)
       )
         operand = operand.expr;
+      if (
+        needsReferenceCastBridge(
+          expressionType(operand, (slot) => rc.declTypes?.get(slot)),
+          e.jtype,
+          rc.ctx,
+        )
+      )
+        operand = {
+          kind: 'cast',
+          jtype: { kind: 'class', name: 'java/lang/Object' },
+          expr: operand,
+        };
       const inner = exprStr(operand, rc, PREC.unary, true, e.jtype);
       return [`(${t}) ${inner}`, PREC.cast];
     }
     case 'instanceof': {
-      const l = exprStr(e.expr, rc, PREC.rel);
+      const operand: Expr = needsReferenceCastBridge(
+        expressionType(e.expr, (slot) => rc.declTypes?.get(slot)),
+        e.checkType,
+        rc.ctx,
+      )
+        ? { kind: 'cast', jtype: { kind: 'class', name: 'java/lang/Object' }, expr: e.expr }
+        : e.expr;
+      const l = exprStr(operand, rc, PREC.rel);
       const t = typeStr(e.checkType, rc);
       const bind = e.bindName ? ` ${e.bindName}` : '';
       return [`${l} instanceof ${t}${bind}`, PREC.rel];
@@ -132,7 +159,8 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         );
         const recovered =
           cls && method ? recoverInnerAccessor(rc.ctx, cls, method, e.args) : undefined;
-        if (recovered) return exprPrec(prepareExpression(recovered, rc.ctx, rc.className), rc);
+        if (recovered)
+          return exprPrec(prepareExpression(recovered, rc.ctx, rc.className, rc.declTypes), rc);
         if (e.owner === rc.className)
           return [
             formatJavaCall(

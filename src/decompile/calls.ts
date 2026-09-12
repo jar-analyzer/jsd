@@ -12,13 +12,14 @@ export function adaptCallArgument(
   name: string,
   rawReceiver = false,
   allowUnknownOverloads = false,
+  actual = expressionType(a),
 ): Expr {
   if (!descriptor) return a;
   const signature = parseMethodDescriptor(descriptor);
   const pt = signature.params[i];
-  const at = expressionType(a);
+  const at = actual;
   if (!pt) return a;
-  if (pt.kind === 'prim') return adaptPrimitiveValue(a, pt);
+  if (pt.kind === 'prim') return adaptPrimitiveValue(a, pt, at);
   if (
     a.kind === 'invoke' &&
     a.owner === 'java/lang/invoke/LambdaMetafactory' &&

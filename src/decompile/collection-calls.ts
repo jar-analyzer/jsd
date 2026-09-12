@@ -56,6 +56,14 @@ function parameters(owner: string, name: string, descriptor: string): Parameter[
   if (!owner.startsWith('java/util/')) return undefined;
   const type = owner.slice('java/util/'.length);
   const method = name + descriptor;
+  if (['Iterator', 'ListIterator'].includes(type) && method === 'next()Ljava/lang/Object;')
+    return [];
+  if (type === 'ListIterator' && method === 'previous()Ljava/lang/Object;') return [];
+  if (['Map$Entry', 'AbstractMap$SimpleEntry', 'AbstractMap$SimpleImmutableEntry'].includes(type)) {
+    if (method === 'getKey()Ljava/lang/Object;' || method === 'getValue()Ljava/lang/Object;')
+      return [];
+    if (method === 'setValue(Ljava/lang/Object;)Ljava/lang/Object;') return [1];
+  }
   if (collections.has(type)) {
     if (method === 'add(Ljava/lang/Object;)Z') return [0];
     if (method === 'contains(Ljava/lang/Object;)Z' || method === 'equals(Ljava/lang/Object;)Z')

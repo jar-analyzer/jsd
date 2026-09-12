@@ -1,11 +1,16 @@
 import type { Expr } from '../../ast/ast.js';
 import { expressionType } from '../../ast/types.js';
-import { parseMethodDescriptor, type JType } from '../../classfile/types.js';
-import type { Ctx } from '../context.js';
+import { parseMethodDescriptor, parseSignature, type JType } from '../../classfile/types.js';
+import { type Ctx, typeKey } from '../context.js';
 import { adaptCallArgument, adaptPrimitiveValue } from '../calls.js';
 import { directCollectionCall } from '../collection-calls.js';
 
-export function prepareExpression(e: Expr, ctx: Ctx, currentClass?: string): Expr {
+export function prepareExpression(
+  e: Expr,
+  ctx: Ctx,
+  currentClass?: string,
+  locals?: ReadonlyMap<number, JType>,
+): Expr {
   if (e.kind === 'invoke' && !e.bootstrap) {
     const receiver = e.target ? expressionType(e.target) : undefined;
     const directCollection = directCollectionCall(e, ctx, currentClass);
@@ -14,7 +19,17 @@ export function prepareExpression(e: Expr, ctx: Ctx, currentClass?: string): Exp
       !receiver.args?.length &&
       !ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
     const args = e.args.map((arg, i) =>
-      adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, e.name, raw, !directCollection),
+      adaptCallArgument(
+        arg,
+        e.descriptor,
+        i,
+        ctx,
+        e.owner,
+        e.name,
+        raw,
+        !directCollection,
+        expressionType(arg, (slot) => locals?.get(slot)),
+      ),
     );
     const ownerType: JType = { kind: 'class', name: e.owner };
     const rawTarget =
@@ -34,20 +49,35 @@ export function prepareExpression(e: Expr, ctx: Ctx, currentClass?: string): Exp
           }
         : e.target;
     const ret = parseMethodDescriptor(e.descriptor).ret;
+    const signature = ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
+    const generic = signature ? parseSignature(signature) : undefined;
+    const genericResult =
+      generic && !('kind' in generic) && !sameRawReferenceType(generic.ret, ret);
     const eraseResult =
-      !ctx.lookup(e.owner) &&
       ret.kind !== 'prim' &&
-      (directCollection?.eraseResult ||
-        args.some(
-          (arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim',
-        ));
+      (!!genericResult ||
+        (!ctx.lookup(e.owner) &&
+          (directCollection?.eraseResult ||
+            args.some(
+              (arg, i) => arg !== e.args[i] && arg.kind === 'cast' && arg.jtype.kind !== 'prim',
+            ))));
     return { ...e, target, args, eraseResult };
   }
   if (e.kind === 'new')
     return {
       ...e,
       args: e.args.map((arg, i) =>
-        adaptCallArgument(arg, e.descriptor, i, ctx, e.owner, '<init>', false, true),
+        adaptCallArgument(
+          arg,
+          e.descriptor,
+          i,
+          ctx,
+          e.owner,
+          '<init>',
+          false,
+          true,
+          expressionType(arg, (slot) => locals?.get(slot)),
+        ),
       ),
     };
   if (e.kind === 'assign-expr' && e.target.kind === 'field') {
@@ -74,6 +104,8 @@ export function prepareReturnValue(
   locals?: ReadonlyMap<number, JType>,
 ): Expr {
   const actual = expressionType(expr, (slot) => locals?.get(slot));
+  if (type && genericArrayOrVariable(type) && (!actual || typeKey(actual) !== typeKey(type)))
+    return { kind: 'cast', jtype: type, expr };
   if (
     type?.kind === 'prim' &&
     type.name === 'boolean' &&
@@ -96,6 +128,10 @@ export function prepareReturnValue(
         expressionType(expr, (slot) => locals?.get(slot)),
       )
     : expr;
+}
+
+function genericArrayOrVariable(type: JType): boolean {
+  return type.kind === 'typevar' || (type.kind === 'array' && genericArrayOrVariable(type.elem));
 }
 
 function adaptConst(v: Expr, targetType: JType): Expr {

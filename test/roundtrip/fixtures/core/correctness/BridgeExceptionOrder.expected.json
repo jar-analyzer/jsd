@@ -1,0 +1,3 @@
+{
+  "stdout": "receiverargument:cast\nfinally:receiverargument\nreceiverargument:null\nfinally:receiverargument\nreceiverargument:argument\nfinally:receiverargument\nreceiverargument:argument\nfinally:receiverargument\nbridge\ninteger\n"
+}
