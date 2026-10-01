@@ -2,7 +2,7 @@
 
 ## 1.3.0
 
-release date:
+release date: 2026.10.01
 
 changelog:
 
