@@ -12,6 +12,7 @@ changelog:
 - Adapt merged integer values to boolean call arguments.
 - Remove redundant casts from standard collection calls.
 - Fix calls to generic collection superclass methods.
+- Avoid crashes on damaged collection receiver signatures.
 - Preserve erased generic results during overload resolution.
 - Remove redundant synthetic local copies.
 - Inline safe single-use synthetic values.
@@ -22,6 +23,8 @@ changelog:
 - Preserve anonymous-class native methods.
 - Restore generic inner-class constructor signatures.
 - Fix generic inner-class construction.
+- Fix inner-class constructor delegation.
+- Restore enclosing-instance access in inner-class constructors.
 - Qualify nested member-class type names.
 
 更新内容:
@@ -32,6 +35,7 @@ changelog:
 - 将合并后的整数值正确转换为布尔调用实参。
 - 消除标准集合调用中的多余强制类型转换。
 - 修复泛型集合父类的方法调用。
+- 避免集合调用接收者的泛型签名损坏时反编译崩溃。
 - 保留重载选择所需的泛型擦除返回值类型。
 - 消除冗余的合成局部变量复制。
 - 内联可安全合并的单次使用中间值。
@@ -42,6 +46,8 @@ changelog:
 - 保留匿名类的 native 方法。
 - 恢复泛型内部类构造器签名。
 - 修复泛型内部类构造表达式。
+- 修复内部类构造器委托。
+- 恢复内部类构造器中的外部实例访问。
 - 补全嵌套成员类类型的限定名。
 
 ## 1.2.0

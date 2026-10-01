@@ -207,3 +207,54 @@ test('collection cleanup retains explicit receiver casts and argument casts', ()
   ];
   assert.equal(prepared(e).args[0].kind, 'cast');
 });
+
+test('non-collection superclass calls tolerate a damaged class signature', () => {
+  const cls = parseClass(classBytes('DamagedSignature', []));
+  cls.signature = '<T:Ljava/lang/Object;>Ljava/lang/Object7';
+  const ctx = new Ctx(cls, new Map());
+  const e = call('java/lang/Object', '<init>', '()V', []);
+  e.mode = 'special';
+  e.superCall = true;
+  e.target = { kind: 'this' };
+  const out = prepareExpression(e, ctx, cls.name);
+  assert.equal(out.kind, 'invoke');
+  if (out.kind !== 'invoke') throw new Error('Expected invocation');
+  assert.deepEqual(out.args, []);
+  assert.equal(out.target, e.target);
+});
+
+test('damaged collection receiver signatures retain conservative argument casts', () => {
+  const cls = parseClass(classBytes('DamagedCollection', []));
+  cls.superName = 'java/util/ArrayList';
+  cls.signature = 'Ljava/util/ArrayList<Ljava/lang/String;>7';
+  cls.fields.push({
+    access: 0,
+    name: 'values',
+    descriptor: 'Ljava/util/List;',
+    signature: 'Ljava/util/List<Ljava/lang/String;>7',
+    annotations: [],
+    synthetic: false,
+    deprecated: false,
+  });
+  const ctx = new Ctx(cls, new Map());
+  const inherited = call('java/util/ArrayList', 'add', '(Ljava/lang/Object;)Z', [value]);
+  inherited.mode = 'special';
+  inherited.superCall = true;
+  inherited.target = { kind: 'this' };
+  const field = call('java/util/List', 'add', '(Ljava/lang/Object;)Z', [value]);
+  field.target = {
+    kind: 'field-get',
+    owner: cls.name,
+    name: 'values',
+    target: { kind: 'this' },
+    jtype: { kind: 'class', name: 'java/util/List' },
+  };
+  for (const e of [inherited, field]) {
+    const before = structuredClone(e);
+    const out = prepareExpression(e, ctx, cls.name);
+    assert.equal(out.kind, 'invoke');
+    if (out.kind !== 'invoke') throw new Error('Expected invocation');
+    assert.equal(out.args[0].kind, 'cast');
+    assert.deepEqual(e, before);
+  }
+});

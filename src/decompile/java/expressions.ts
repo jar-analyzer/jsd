@@ -4,6 +4,7 @@ import { parseMethodDescriptor, parseSignature, type JType } from '../../classfi
 import { type Ctx, typeKey } from '../context.js';
 import { adaptCallArgument, adaptPrimitiveValue } from '../calls.js';
 import { directCollectionCall } from '../collection-calls.js';
+import { ctorHasOuterParam } from '../classgen/methodsig.js';
 
 export function prepareExpression(
   e: Expr,
@@ -12,14 +13,38 @@ export function prepareExpression(
   locals?: ReadonlyMap<number, JType>,
 ): Expr {
   if (e.kind === 'invoke' && !e.bootstrap) {
+    const method = ctx.methodInfo(e.owner, e.name, e.descriptor)?.m;
+    const generic = method?.signature ? parseSignature(method.signature) : undefined;
+    const cls = ctx.lookup(e.owner);
+    const delegation = e.name === '<init>' && e.owner === currentClass && e.target?.kind === 'this';
+    const outerPrefix = delegation && cls && method && ctorHasOuterParam(cls, method) ? 1 : 0;
+    const sourceParams =
+      outerPrefix === 1 &&
+      generic &&
+      !('kind' in generic) &&
+      generic.params.length + outerPrefix === e.args.length
+        ? generic.params
+        : undefined;
+    const constructorVariables = new Set(
+      sourceParams && generic && !('kind' in generic)
+        ? generic.typeParams.map((type) => type.name)
+        : [],
+    );
     const receiver = e.target ? expressionType(e.target) : undefined;
     const directCollection = directCollectionCall(e, ctx, currentClass);
     const raw =
       receiver?.kind === 'class' &&
       !receiver.args?.length &&
       !ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
-    const args = e.args.map((arg, i) =>
-      adaptCallArgument(
+    const args = e.args.map((arg, i) => {
+      const parameter = sourceParams?.[i - outerPrefix];
+      if (
+        parameter &&
+        parameter.kind !== 'prim' &&
+        !usesTypeVariable(parameter, constructorVariables)
+      )
+        return { kind: 'cast' as const, jtype: parameter, expr: arg };
+      return adaptCallArgument(
         arg,
         e.descriptor,
         i,
@@ -29,8 +54,8 @@ export function prepareExpression(
         raw,
         !directCollection,
         expressionType(arg, (slot) => locals?.get(slot)),
-      ),
-    );
+      );
+    });
     const ownerType: JType = { kind: 'class', name: e.owner };
     const rawTarget =
       e.target &&
@@ -49,8 +74,6 @@ export function prepareExpression(
           }
         : e.target;
     const ret = parseMethodDescriptor(e.descriptor).ret;
-    const signature = ctx.methodInfo(e.owner, e.name, e.descriptor)?.m.signature;
-    const generic = signature ? parseSignature(signature) : undefined;
     const genericResult =
       generic && !('kind' in generic) && !sameRawReferenceType(generic.ret, ret);
     const eraseResult =
@@ -96,6 +119,22 @@ export function prepareExpression(
     return { ...e, parts };
   }
   return e;
+}
+
+function usesTypeVariable(type: JType, names: ReadonlySet<string>): boolean {
+  if (type.kind === 'typevar') return names.has(type.name);
+  if (type.kind === 'array') return usesTypeVariable(type.elem, names);
+  if (type.kind === 'class')
+    return (
+      !!(type.owner && usesTypeVariable(type.owner, names)) ||
+      !!type.args?.some((arg) => usesTypeVariable(arg, names))
+    );
+  if (type.kind === 'wildcard')
+    return (
+      !!(type.bound && usesTypeVariable(type.bound, names)) ||
+      !!(type.superBound && usesTypeVariable(type.superBound, names))
+    );
+  return false;
 }
 
 export function prepareReturnValue(

@@ -510,6 +510,14 @@ export const membersPart: ThisType<ClassGenerator> &
     };
     const sig = this.methodSignature(m);
     rc.returnType = sig.ret;
+    if (innerStripCtor(m, this.cls)) {
+      const outer = parseMethodDescriptor(m.descriptor).params[0];
+      const name = `${typeStr(outer, rc)}.this`;
+      rc.slotNames.set(1, name);
+      rc.declared.add(1);
+      rc.scopes[0].set(1, name);
+      rc.slotTypes.set(1, outer);
+    }
     sig.slots.forEach((slot, i) => {
       rc.slotNames.set(slot, sig.params[i].name);
       rc.declared.add(slot);

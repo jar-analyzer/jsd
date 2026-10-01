@@ -4,6 +4,7 @@ import { formatJavaBinary, formatJavaCall, indentJava } from './layout.js';
 import { prepareExpression, sameRawReferenceType } from '../java/expressions.js';
 import { expressionType } from '../../ast/types.js';
 import { needsReferenceCastBridge } from '../java/reference-casts.js';
+import { ctorHasOuterParam } from '../classgen/methodsig.js';
 import { initialType } from '../java/types.js';
 import { javaLiteral } from './literals.js';
 import { AssignTarget, Expr, walkExpr } from '../../ast/ast.js';
@@ -183,7 +184,25 @@ function exprPrec(e: Expr, rc: RenderCtx): [string, number] {
         }
         return [formatJavaCall(`super.${methodName}`, args), PREC.postfix];
       }
-      if (e.name === '<init>') return [formatJavaCall(typeArgs + 'this', args), PREC.postfix];
+      if (e.name === '<init>') {
+        const cls = rc.ctx.lookup(e.owner);
+        const ctor = cls?.methods.find(
+          (method) => method.name === '<init>' && method.descriptor === e.descriptor,
+        );
+        const first = e.args[0];
+        const hiddenOuter =
+          e.owner === rc.className &&
+          e.target?.kind === 'this' &&
+          cls &&
+          ctor &&
+          ctorHasOuterParam(cls, ctor) &&
+          first?.kind === 'local' &&
+          first.slot === 1;
+        return [
+          formatJavaCall(typeArgs + 'this', hiddenOuter ? args.slice(1) : args),
+          PREC.postfix,
+        ];
+      }
       if (e.target) {
         if (e.target.kind === 'this' && e.owner === rc.className) {
           return [formatJavaCall(typeArgs ? `this.${methodName}` : e.name, args), PREC.postfix];

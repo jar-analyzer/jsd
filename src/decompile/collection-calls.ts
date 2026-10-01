@@ -159,27 +159,36 @@ export function directCollectionCall(
     ctx.lookup(e.owner)
   )
     return undefined;
+  const wanted = parameters(e.owner, e.name, e.descriptor);
+  if (!wanted || wanted.length !== e.args.length) return undefined;
   let receiver = expressionType(e.target);
   if (e.superCall) {
     const cls = currentClass ? ctx.lookup(currentClass) : undefined;
     if (!cls || cls.superName !== e.owner) return undefined;
-    receiver = cls.signature
-      ? parseClassSignature(cls.signature).superType
-      : { kind: 'class', name: e.owner };
+    try {
+      receiver = cls.signature
+        ? parseClassSignature(cls.signature).superType
+        : { kind: 'class', name: e.owner };
+    } catch {
+      return undefined;
+    }
   } else if (e.target.kind === 'field-get') {
     const target = e.target;
     const field = ctx.lookup(target.owner)?.fields.find((field) => field.name === target.name);
     if (!field) return undefined;
     if (field.signature) {
-      const signature = parseSignature(field.signature);
-      if (!('kind' in signature)) return undefined;
-      receiver = signature;
+      try {
+        const signature = parseSignature(field.signature);
+        if (!('kind' in signature)) return undefined;
+        receiver = signature;
+      } catch {
+        return undefined;
+      }
     }
   } else if (!['local', 'cast', 'new'].includes(e.target.kind)) return undefined;
   if (receiver?.kind !== 'class' || ctx.lookup(receiver.name)) return undefined;
-  const wanted = parameters(e.owner, e.name, e.descriptor);
   const available = parameters(receiver.name, e.name, e.descriptor);
-  if (!wanted || !available || wanted.length !== e.args.length) return undefined;
+  if (!available) return undefined;
   const compatible = available.every((parameter, i) => {
     const arg = e.args[i];
     if (parameter === 'index') return true;

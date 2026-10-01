@@ -13,6 +13,7 @@ const cases = new Set([
   'AnonymousStrict',
   'AnonymousVisibility',
   'GenericInnerEmpty',
+  'GenericInnerDelegation',
   'GenericInnerSimple',
   'InnerConstructionSemantics',
   'InterfaceStrict',
