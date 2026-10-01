@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 1.4.0
+
+release date:
+
+changelog:
+
+- todo
+
+更新内容:
+
+- todo
+
 ## 1.3.0
 
 release date: 2026.10.01
