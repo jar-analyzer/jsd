@@ -311,7 +311,34 @@ export const loopPart: ThisType<Structurer> &
           breakables: [...wctx.breakables, brk],
         };
         const selfLoop = condBlock === header;
-        const bodySet = new Set([...loopNodes].filter((x) => x !== condBlock || selfLoop));
+        // The do-while body is what the header reaches without first passing the
+        // condition or the block the condition jumps to on exit. Deriving it from
+        // loopNodes alone is not enough: that set can carry blocks laid out after the
+        // loop (the walk then nests the rest of the method inside the body).
+        const exitAfterCond = cT.jumpB === header ? cT.fallB : cT.jumpB;
+        const stop = new Set<number>([condBlock, ...loopExits]);
+        if (exitAfterCond >= 0) stop.add(exitAfterCond);
+        const bodySet = new Set<number>();
+        if (selfLoop) {
+          bodySet.add(header);
+        } else {
+          const pending = [header];
+          while (pending.length) {
+            const block = pending.pop()!;
+            if (block < 0 || bodySet.has(block) || stop.has(block) || !nodes.has(block)) continue;
+            bodySet.add(block);
+            for (const succ of this.cfg.blocks[block].succs) pending.push(succ);
+          }
+        }
+        // loopNodes can carry blocks laid out after the loop, which leaves exitSet empty
+        // and the loop without a break target. The condition's exit edge is the loop's
+        // real successor in that case.
+        if (exitAfterCond >= 0) {
+          loopExits.add(exitAfterCond);
+          brk.exits.add(exitAfterCond);
+          if (brk.naturalExit === undefined || brk.naturalExit < 0) brk.naturalExit = exitAfterCond;
+          if (after < 0) after = exitAfterCond;
+        }
         const body = selfLoop
           ? [...this.sim.stmts[header]]
           : this.walk(header, bodySet, new Set([...loopExits]), wctx2);
