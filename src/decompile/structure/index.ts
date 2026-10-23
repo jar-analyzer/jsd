@@ -233,7 +233,11 @@ export class Structurer {
           return stmts;
         case 'goto': {
           const tgt = term.target;
-          if (follow.has(tgt) || !nodes.has(tgt) || this.claimed[tgt]) {
+          // Jumping to a loop continue target is a continue statement, never code to
+          // inline: walking into the header or the update block would move the loop's
+          // own code inside the branch that jumps there.
+          const toContinue = graph.enclosingContinueTargets(wctx).has(tgt);
+          if (toContinue || follow.has(tgt) || !nodes.has(tgt) || this.claimed[tgt]) {
             this.endEdge(stmts, cur, tgt, wctx, true);
             return stmts;
           }
@@ -296,7 +300,10 @@ export class Structurer {
     for (let i = wctx.breakables.length - 1; i >= 0; i--) {
       const br = wctx.breakables[i];
       if (br.kind === 'loop' && br.continueTargets?.has(to)) {
-        if (viaGoto) this.emitJump('continue', stmts, br, wctx, i);
+        // Only the loop's own latch edge is implicit. Any other edge into a continue
+        // target, a fall-through into an update block included, has to be spelled out.
+        if (viaGoto || !wctx.implicitEnds.has(from + '->' + to))
+          this.emitJump('continue', stmts, br, wctx, i);
         return;
       }
     }
@@ -307,9 +314,16 @@ export class Structurer {
   }
 
   breakFor(t: number, wctx: WalkCtx): number {
+    // An exact natural exit wins over a breakable that merely accepts any of its exits:
+    // a switch inside a loop lists the loop's exit block among its exits, so the wildcard
+    // match would turn a break out of the loop into a break out of the switch.
     for (let i = wctx.breakables.length - 1; i >= 0; i--) {
       const br = wctx.breakables[i];
-      if (br.exits.has(t) && (br.naturalExit === t || br.naturalExit === -1)) return i;
+      if (br.naturalExit === t && br.exits.has(t)) return i;
+    }
+    for (let i = wctx.breakables.length - 1; i >= 0; i--) {
+      const br = wctx.breakables[i];
+      if (br.naturalExit === -1 && br.exits.has(t)) return i;
     }
     return -1;
   }
@@ -339,8 +353,14 @@ export class Structurer {
     return s;
   }
 
-  pickFollow(b: number, nodes: Set<number>, follow: Set<number>, arms: number[]): number {
-    return graph.pickFollow(this, b, nodes, follow, arms);
+  pickFollow(
+    b: number,
+    nodes: Set<number>,
+    follow: Set<number>,
+    arms: number[],
+    avoid?: Set<number>,
+  ): number {
+    return graph.pickFollow(this, b, nodes, follow, arms, avoid);
   }
   reachableSet(from: number): Set<number> {
     return graph.reachableSet(this, from);

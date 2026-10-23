@@ -1,4 +1,14 @@
 import type { Structurer } from './index.js';
+import type { WalkCtx } from './types.js';
+
+export function enclosingContinueTargets(wctx: WalkCtx): Set<number> {
+  const out = new Set<number>();
+  for (const br of wctx.breakables) {
+    if (br.kind !== 'loop' || !br.continueTargets) continue;
+    for (const target of br.continueTargets) out.add(target);
+  }
+  return out;
+}
 
 export function pickFollow(
   state: Structurer,
@@ -6,14 +16,17 @@ export function pickFollow(
   nodes: Set<number>,
   follow: Set<number>,
   arms: number[],
+  avoid?: Set<number>,
 ): number {
   if (b < 0) return -1;
+  const blocked = (c: number): boolean => !!avoid?.has(c);
   const ipd = state.cfg.ipdom[b];
   if (
     ipd >= 0 &&
     ipd < state.cfg.blocks.length &&
     ipd !== b &&
     !follow.has(ipd) &&
+    !blocked(ipd) &&
     !state.claimed[ipd] &&
     !state.absorbed.has(ipd)
   ) {
@@ -23,7 +36,8 @@ export function pickFollow(
     const succSets = arms.filter((a) => a >= 0).map((a) => new Set(state.cfg.blocks[a].succs));
     const common = [...succSets[0]].filter((x) => succSets.every((ss) => ss.has(x)));
     for (const c of common) {
-      if (nodes.has(c) && !follow.has(c) && !state.claimed[c] && !arms.includes(c)) return c;
+      if (nodes.has(c) && !follow.has(c) && !blocked(c) && !state.claimed[c] && !arms.includes(c))
+        return c;
     }
   }
   return -1;
