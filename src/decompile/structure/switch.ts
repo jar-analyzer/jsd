@@ -269,6 +269,27 @@ export const switchPart: ThisType<Structurer> &
       );
     const sw: Stmt = { kind: 'switch', subject, cases, scopedCases };
     if (patMode) (sw as { patternMode?: boolean }).patternMode = true;
+    if ((globalThis as { JSD_DBG_SW?: boolean }).JSD_DBG_SW)
+      console.error(
+        '[sw] b=' +
+          b +
+          ' followNode=' +
+          followNode +
+          ' cases=' +
+          cases
+            .map(
+              (c) =>
+                JSON.stringify(c.labels) +
+                (c.hasDefault ? '/def' : '') +
+                ':' +
+                c.body
+                  .map((s) =>
+                    s.kind === 'expr' ? 'e:' + (s.expr as { kind: string }).kind : s.kind,
+                  )
+                  .join(','),
+            )
+            .join(' | '),
+      );
     stmts.push(sw);
     return followNode;
   },
