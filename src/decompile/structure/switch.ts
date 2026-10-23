@@ -1,6 +1,7 @@
 import type { SwitchLabel } from '../simulate/result.js';
 import { attemptRecognition } from './recognition.js';
 import { Expr, Stmt } from '../../ast/ast.js';
+import { enclosingContinueTargets } from './graph.js';
 import type { ClassFile } from '../../classfile/model.js';
 import { decodeBytecode } from '../../bytecode/decode.js';
 import type { WalkCtx, Breakable } from './types.js';
@@ -23,6 +24,45 @@ function isPushConst(op: number): boolean {
 function constValOf(ins: { op: number; imm?: number }): number {
   if (ins.op >= 0x02 && ins.op <= 0x08) return ins.op - 0x03;
   return ins.imm ?? 0;
+}
+
+/**
+ * The nearest block two or more arms reach directly. Used when no post-dominator
+ * survives: inside a loop the post-dominator of every block is the loop header, and a
+ * follow there would swallow the arms that continue the loop instead of ending at the
+ * code after the switch.
+ */
+function commonArmSuccessor(
+  state: Structurer,
+  arms: number[],
+  nodes: Set<number>,
+  follow: Set<number>,
+  avoid: Set<number>,
+): number {
+  const counts = new Map<number, number>();
+  for (const arm of arms) {
+    const block = arm >= 0 ? state.cfg.blocks[arm] : undefined;
+    if (!block) continue;
+    for (const succ of block.succs) {
+      if (succ < 0 || avoid.has(succ) || follow.has(succ)) continue;
+      if (!nodes.has(succ) || state.claimed[succ]) continue;
+      counts.set(succ, (counts.get(succ) ?? 0) + 1);
+    }
+  }
+  let best = -1;
+  let bestCount = 1;
+  for (const [block, count] of counts) {
+    if (count < bestCount) continue;
+    if (
+      count > bestCount ||
+      best < 0 ||
+      state.cfg.blocks[block].startPc < state.cfg.blocks[best].startPc
+    ) {
+      best = block;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 export const switchPart: ThisType<Structurer> &
@@ -94,6 +134,7 @@ export const switchPart: ThisType<Structurer> &
           nodes,
           follow,
           term.cases.map((c) => c.target),
+          enclosingContinueTargets(wctx),
         );
     } else {
       followNode = this.pickFollow(
@@ -101,8 +142,17 @@ export const switchPart: ThisType<Structurer> &
         nodes,
         follow,
         term.cases.map((c) => c.target),
+        enclosingContinueTargets(wctx),
       );
     }
+    if (followNode === -1)
+      followNode = commonArmSuccessor(
+        this,
+        term.cases.map((c) => c.target),
+        nodes,
+        follow,
+        enclosingContinueTargets(wctx),
+      );
     const brk: Breakable = {
       kind: 'switch',
       exits: new Set([followNode, ...follow]),
@@ -167,6 +217,7 @@ export const switchPart: ThisType<Structurer> &
         new Set([...follow, ...(followNode >= 0 ? [followNode] : [])]),
         later,
         wctx2,
+        followNode,
       );
       let labels: (number | string)[];
       if (Number.isNaN(g.value)) {
@@ -207,6 +258,7 @@ export const switchPart: ThisType<Structurer> &
         new Set([...follow, ...(followNode >= 0 ? [followNode] : [])]),
         new Set(),
         wctx2,
+        followNode,
       );
       cases.push({ labels: [], body, hasDefault: true });
     }
@@ -227,9 +279,24 @@ export const switchPart: ThisType<Structurer> &
     followPlus: Set<number>,
     laterCaseTargets: Set<number>,
     wctx: WalkCtx,
+    ownFollow = -1,
   ): Stmt[] {
-    if (!nodes.has(target) || followPlus.has(target) || this.claimed[target]) {
+    if (this.claimed[target] || target === ownFollow) {
       return [];
+    }
+    // An arm can leave the region instead of falling out of the switch: it may end in an
+    // enclosing loop continue target, in that loop's exit block, or in a block outside the
+    // region altogether. Those targets end the walk, but the arm still needs the continue,
+    // break or return that gets control there, so emit it instead of an empty body.
+    const continueTarget = enclosingContinueTargets(wctx).has(target);
+    if (followPlus.has(target) || continueTarget || !nodes.has(target)) {
+      const out: Stmt[] = [];
+      try {
+        this.edgeToTarget(target, out, wctx);
+      } catch {
+        return [];
+      }
+      return out;
     }
     const stops = new Set<number>([...followPlus, ...laterCaseTargets]);
     const set = this.dfsCollect(target, nodes, stops, this.claimedSet());
@@ -478,6 +545,7 @@ export const switchPart: ThisType<Structurer> &
           nodes,
           follow,
           term.cases.map((c) => c.target),
+          enclosingContinueTargets(wctx),
         );
     } else {
       followNode = this.pickFollow(
@@ -485,8 +553,17 @@ export const switchPart: ThisType<Structurer> &
         nodes,
         follow,
         term.cases.map((c) => c.target),
+        enclosingContinueTargets(wctx),
       );
     }
+    if (followNode === -1)
+      followNode = commonArmSuccessor(
+        this,
+        term.cases.map((c) => c.target),
+        nodes,
+        follow,
+        enclosingContinueTargets(wctx),
+      );
     const brk: Breakable = {
       kind: 'switch',
       exits: new Set([followNode, ...follow]),
