@@ -1,4 +1,4 @@
-import { Expr, Stmt } from '../../ast/ast.js';
+import { AssignTarget, Expr, Stmt } from '../../ast/ast.js';
 import type { JType } from '../../classfile/types.js';
 import { parseMethodDescriptor } from '../../classfile/types.js';
 import type { CFG } from '../../bytecode/cfg.js';
@@ -490,7 +490,81 @@ function normalizeExpr(e: Expr): unknown {
       return normalizeExpr(e.expr);
     case 'monitor':
       return { m: normalizeExpr((e as { expr: Expr }).expr) };
+    case 'assign-expr':
+      return { as: normalizeTarget(e.target), op: e.op ?? null, v: normalizeExpr(e.expr) };
+    case 'ternary':
+      return { q: normalizeExpr(e.cond), a: normalizeExpr(e.thenE), b: normalizeExpr(e.elseE) };
+    case 'bool':
+      return { bl: normalizeExpr(e.inner) };
+    case 'instanceof':
+      return { io: normalizeExpr(e.expr), ty: typeKey(e.checkType) };
+    case 'new':
+      return {
+        nw: e.owner,
+        d: e.descriptor ?? null,
+        a: e.args.map(normalizeExpr),
+        o: e.outer ? normalizeExpr(e.outer) : null,
+      };
+    case 'new-array':
+      return { na: typeKey(e.elemType), dims: e.dims, d: e.dimsExprs.map(normalizeExpr) };
+    case 'array-init':
+      return { ai: typeKey(e.elemType), v: e.values.map(normalizeExpr) };
+    case 'array-length':
+      return { len: normalizeExpr(e.array) };
+    case 'super':
+      return { sp: 1 };
+    case 'outer-this':
+      return { ot: e.owner };
+    case 'class-literal':
+      return { cl: typeKey(e.jtype) };
+    case 'method-ref':
+      return {
+        mr: e.name,
+        o: e.owner,
+        t: e.target ? normalizeExpr(e.target) : null,
+        n: e.isNew ? 1 : 0,
+      };
+    case 'lambda':
+      return {
+        lb: e.params.length,
+        e: e.exprBody ? normalizeExpr(e.exprBody) : null,
+        b: e.body.map(normalizeStmt),
+      };
+    case 'concat':
+      return { cc: e.parts.map(normalizeExpr) };
+    case 'sb-chain':
+      return { sb: e.parts.map(normalizeExpr) };
+    case 'raw':
+      return { rw: e.text };
+    case 'new-uninit':
+      return { nu: e.owner, u: e.uid };
     default:
-      return e.kind;
+      return { k: (e as unknown as { kind: string }).kind };
+  }
+}
+
+function normalizeTarget(t: AssignTarget): unknown {
+  switch (t.kind) {
+    case 'local':
+      return { l: t.slot };
+    case 'field':
+      return { f: t.name, o: t.owner, t: t.target ? normalizeExpr(t.target) : null };
+    case 'array':
+      return { ar: normalizeExpr(t.array), i: normalizeExpr(t.index) };
+  }
+}
+
+function typeKey(t: JType): string {
+  switch (t.kind) {
+    case 'prim':
+      return t.name;
+    case 'class':
+      return t.name;
+    case 'array':
+      return typeKey(t.elem) + '[]';
+    case 'typevar':
+      return t.name;
+    default:
+      return '?';
   }
 }
