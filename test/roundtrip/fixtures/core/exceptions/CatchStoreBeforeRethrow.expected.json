@@ -1,3 +1,3 @@
 {
-  "stdout": "IOException:1:1:100\nNumberFormatException:2:2:120\nIllegalStateException:2:3:120\n"
+  "stdout": "IOException:1:1:1:100\nNumberFormatException:2:2:2:120\nIllegalStateException:2:3:2:120\n"
 }

@@ -1,16 +1,16 @@
 # CHANGELOG
 
-## 1.4.0
+## 1.3.1
 
 release date:
 
 changelog:
 
-- todo
+- Preserve catch field and array assignments when removing duplicated finally code.
 
 更新内容:
 
-- todo
+- 去除重复 finally 代码时保留 catch 中的字段和数组赋值。
 
 ## 1.3.0
 

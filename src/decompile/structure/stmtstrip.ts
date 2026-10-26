@@ -402,7 +402,7 @@ function normalizeStmt(s: Stmt): unknown {
     case 'expr': {
       const e = s.expr;
       if (e.kind === 'assign-expr' && e.target.kind === 'local') {
-        return { a: (e.target as { slot: number }).slot, e: normalizeExpr(e.expr) };
+        return { a: normalizeTarget(e.target), op: e.op ?? null, e: normalizeExpr(e.expr) };
       }
       return { x: normalizeExpr(e) };
     }
@@ -417,12 +417,23 @@ function normalizeStmt(s: Stmt): unknown {
     case 'throw':
       return { w: normalizeExpr(s.expr) };
     case 'while':
-      return { s: s.kind, c: s.cond ? normalizeExpr(s.cond) : null, b: s.body.map(normalizeStmt) };
+      return {
+        s: s.kind,
+        label: s.label ?? null,
+        c: s.cond ? normalizeExpr(s.cond) : null,
+        b: s.body.map(normalizeStmt),
+      };
     case 'do-while':
-      return { s: s.kind, c: normalizeExpr(s.cond), b: s.body.map(normalizeStmt) };
+      return {
+        s: s.kind,
+        label: s.label ?? null,
+        c: normalizeExpr(s.cond),
+        b: s.body.map(normalizeStmt),
+      };
     case 'for':
       return {
         s: s.kind,
+        label: s.label ?? null,
         i: s.init.map(normalizeStmt),
         c: s.cond ? normalizeExpr(s.cond) : null,
         u: s.update.map(normalizeStmt),
@@ -431,7 +442,10 @@ function normalizeStmt(s: Stmt): unknown {
     case 'foreach':
       return {
         s: s.kind,
+        label: s.label ?? null,
+        ty: typeKey(s.varJType),
         v: s.varName,
+        slot: s.varSlot ?? null,
         it: normalizeExpr(s.iterable),
         b: s.body.map(normalizeStmt),
       };
@@ -439,13 +453,32 @@ function normalizeStmt(s: Stmt): unknown {
       return {
         s: s.kind,
         sub: normalizeExpr(s.subject),
-        c: s.cases.map((c) => ({ l: c.labels, b: c.body.map(normalizeStmt) })),
+        sm: s.stringMode ?? false,
+        em: s.enumMode ? { c: s.enumMode.enumClass, l: s.enumMode.labels } : null,
+        pm: s.patternMode ?? false,
+        c: s.cases.map((c) => ({
+          l: c.labels,
+          d: c.hasDefault ?? false,
+          b: c.body.map(normalizeStmt),
+        })),
       };
     case 'try':
       return {
         s: s.kind,
         b: s.body.map(normalizeStmt),
-        c: s.catches.map((c) => ({ t: c.type, b: c.body.map(normalizeStmt) })),
+        c: s.catches.map((c) => ({
+          t: c.type,
+          at: c.annotatedTypes?.map(typeKey),
+          sl: c.varSlot ?? null,
+          b: c.body.map(normalizeStmt),
+        })),
+        r:
+          s.resources?.map((r) => ({
+            t: typeKey(r.jtype),
+            n: r.name,
+            sl: r.slot,
+            i: r.init ? normalizeExpr(r.init) : null,
+          })) ?? [],
         ...(s.finallyS ? { f: s.finallyS.map(normalizeStmt) } : {}),
       };
     case 'sync':
@@ -453,12 +486,20 @@ function normalizeStmt(s: Stmt): unknown {
     case 'label':
       return { s: s.kind, l: s.label, n: normalizeStmt(s.inner) };
     case 'local-decl':
-      return { s: s.kind, n: s.name, ...(s.init ? { i: normalizeExpr(s.init) } : {}) };
+      return {
+        s: s.kind,
+        t: typeKey(s.jtype),
+        n: s.name,
+        sl: s.slot ?? null,
+        ...(s.init ? { i: normalizeExpr(s.init) } : {}),
+      };
+    case 'assert':
+      return { s: s.kind, c: normalizeExpr(s.cond), m: s.msg ? normalizeExpr(s.msg) : null };
     case 'break':
     case 'continue':
       return { s: s.kind, ...(s.label ? { l: s.label } : {}) };
-    default:
-      return { s: s.kind };
+    case 'bad':
+      return { s: s.kind, t: s.text };
   }
 }
 
@@ -466,38 +507,67 @@ function normalizeExpr(e: Expr): unknown {
   if (!e || typeof e !== 'object') return null;
   switch (e.kind) {
     case 'const':
-      return { c: e.ctype, v: String(e.value) };
+      return { c: e.ctype, v: String(e.value), bits: e.rawBits ?? null };
     case 'local':
-      return { l: (e as { slot?: number }).slot };
+      return { l: e.slot, ty: e.jtype ? typeKey(e.jtype) : null };
     case 'this':
       return { t: 1 };
     case 'invoke':
       return {
         i: e.name,
         o: e.owner,
+        d: e.descriptor,
+        m: e.mode,
+        sc: e.superCall ?? false,
+        el: e.eraseResult ?? false,
+        erased: e.erasedLambda ?? false,
+        boot: e.bootstrap
+          ? { n: e.bootstrap.name, i: e.bootstrap.index, it: e.bootstrap.interfaces ?? [] }
+          : null,
         t: e.target ? normalizeExpr(e.target) : null,
         a: e.args.map(normalizeExpr),
       };
     case 'field-get':
-      return { f: e.name, o: e.owner, t: e.target ? normalizeExpr(e.target) : null };
+      return {
+        f: e.name,
+        o: e.owner,
+        ty: e.jtype ? typeKey(e.jtype) : null,
+        t: e.target ? normalizeExpr(e.target) : null,
+      };
     case 'binary':
-      return { b: e.op, l: normalizeExpr(e.left), r: normalizeExpr(e.right) };
+      return {
+        b: e.op,
+        nan: e.nanResult ?? null,
+        fc: e.floatingComparison ?? false,
+        l: normalizeExpr(e.left),
+        r: normalizeExpr(e.right),
+      };
     case 'unary':
       return { u: e.op, e: normalizeExpr(e.operand) };
     case 'array-load':
-      return { al: 1, a: normalizeExpr(e.array), i: normalizeExpr(e.index) };
+      return {
+        al: 1,
+        ty: e.jtype ? typeKey(e.jtype) : null,
+        a: normalizeExpr(e.array),
+        i: normalizeExpr(e.index),
+      };
     case 'cast':
-      return normalizeExpr(e.expr);
+      return { cast: typeKey(e.jtype), e: normalizeExpr(e.expr) };
     case 'monitor':
       return { m: normalizeExpr((e as { expr: Expr }).expr) };
     case 'assign-expr':
       return { as: normalizeTarget(e.target), op: e.op ?? null, v: normalizeExpr(e.expr) };
     case 'ternary':
-      return { q: normalizeExpr(e.cond), a: normalizeExpr(e.thenE), b: normalizeExpr(e.elseE) };
+      return {
+        q: normalizeExpr(e.cond),
+        ty: e.jtype ? typeKey(e.jtype) : null,
+        a: normalizeExpr(e.thenE),
+        b: normalizeExpr(e.elseE),
+      };
     case 'bool':
       return { bl: normalizeExpr(e.inner) };
     case 'instanceof':
-      return { io: normalizeExpr(e.expr), ty: typeKey(e.checkType) };
+      return { io: normalizeExpr(e.expr), ty: typeKey(e.checkType), bind: e.bindName ?? null };
     case 'new':
       return {
         nw: e.owner,
@@ -521,19 +591,25 @@ function normalizeExpr(e: Expr): unknown {
       return {
         mr: e.name,
         o: e.owner,
+        d: e.descriptor,
+        k: e.kindRef ?? null,
         t: e.target ? normalizeExpr(e.target) : null,
         n: e.isNew ? 1 : 0,
       };
     case 'lambda':
       return {
-        lb: e.params.length,
+        lb: e.params.map((p) => (p.jtype ? typeKey(p.jtype) : null)),
         e: e.exprBody ? normalizeExpr(e.exprBody) : null,
         b: e.body.map(normalizeStmt),
       };
     case 'concat':
-      return { cc: e.parts.map(normalizeExpr) };
+      return {
+        cc: e.parts.map(normalizeExpr),
+        ty: e.jtype ? typeKey(e.jtype) : null,
+        t: e.partTypes?.map((t) => (t ? typeKey(t) : null)) ?? null,
+      };
     case 'sb-chain':
-      return { sb: e.parts.map(normalizeExpr) };
+      return { sb: e.parts.map(normalizeExpr), ty: e.jtype ? typeKey(e.jtype) : null };
     case 'raw':
       return { rw: e.text };
     case 'new-uninit':
@@ -546,9 +622,14 @@ function normalizeExpr(e: Expr): unknown {
 function normalizeTarget(t: AssignTarget): unknown {
   switch (t.kind) {
     case 'local':
-      return { l: t.slot };
+      return { l: t.slot, ty: t.jtype ? typeKey(t.jtype) : null };
     case 'field':
-      return { f: t.name, o: t.owner, t: t.target ? normalizeExpr(t.target) : null };
+      return {
+        f: t.name,
+        o: t.owner,
+        ty: t.jtype ? typeKey(t.jtype) : null,
+        t: t.target ? normalizeExpr(t.target) : null,
+      };
     case 'array':
       return { ar: normalizeExpr(t.array), i: normalizeExpr(t.index) };
   }
@@ -559,11 +640,13 @@ function typeKey(t: JType): string {
     case 'prim':
       return t.name;
     case 'class':
-      return t.name;
+      return `${t.owner ? `${typeKey(t.owner)}$` : ''}${t.name}${t.args?.length ? `<${t.args.map(typeKey).join(',')}>` : ''}`;
     case 'array':
       return typeKey(t.elem) + '[]';
     case 'typevar':
       return t.name;
+    case 'wildcard':
+      return t.bound ? `+${typeKey(t.bound)}` : t.superBound ? `-${typeKey(t.superBound)}` : '*';
     default:
       return '?';
   }

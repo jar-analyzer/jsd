@@ -2,6 +2,7 @@ public class CatchStoreBeforeRethrow {
 
   static int attempts;
   static int cleanups;
+  static int marker;
   static int[] slots = new int[3];
 
   static void run(int mode) throws Exception {
@@ -11,6 +12,7 @@ public class CatchStoreBeforeRethrow {
       throw new IllegalStateException("is");
     } catch (java.io.IOException | NumberFormatException ex) {
       attempts++;
+      marker = attempts;
       slots[mode] = attempts;
       throw ex;
     } finally {
@@ -29,6 +31,8 @@ public class CatchStoreBeforeRethrow {
             attempts +
             ":" +
             cleanups +
+            ":" +
+            marker +
             ":" +
             slots[0] +
             slots[1] +
