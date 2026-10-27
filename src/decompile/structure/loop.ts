@@ -66,6 +66,34 @@ function stmtAssignsSlot(s: Stmt, slot: number): boolean {
   return false;
 }
 
+/** Whether every path through this statement leaves the block it is in. */
+function stmtTerminates(s: Stmt): boolean {
+  switch (s.kind) {
+    case 'break':
+    case 'continue':
+    case 'return':
+    case 'throw':
+      return true;
+    case 'if':
+      return !!s.elseS && blockTerminates(s.thenS) && blockTerminates(s.elseS);
+    case 'label':
+      return stmtTerminates(s.inner);
+    case 'switch':
+      return (
+        s.cases.length > 0 &&
+        s.cases.some((c) => c.hasDefault) &&
+        s.cases.every((c) => blockTerminates(c.body))
+      );
+    default:
+      return false;
+  }
+}
+
+function blockTerminates(body: Stmt[]): boolean {
+  const last = body[body.length - 1];
+  return last ? stmtTerminates(last) : false;
+}
+
 export const loopPart: ThisType<Structurer> &
   Pick<Structurer, 'handleLoop' | 'makeLoopBreakable' | 'loopAfter' | 'recoverFor'> = {
   handleLoop(
@@ -160,7 +188,15 @@ export const loopPart: ThisType<Structurer> &
     const loopExits = new Set<number>([...exitSet, ...follow]);
 
     const headerTerm = this.t(header);
-    const backSrc = loop.backSrcs.find((u) => loopNodes.has(u)) ?? loop.backSrcs[0];
+    // The latch is the body block that ends the loop, not whichever back edge the CFG
+    // lists first: a switch arm that jumps back to the header is a continue, and taking
+    // it as the latch makes the structurer treat that continue as the implicit one.
+    const bodyBackSrcs = loop.backSrcs.filter((u) => loopNodes.has(u));
+    const backSrc = bodyBackSrcs.length
+      ? bodyBackSrcs.reduce((a, b) =>
+          this.cfg.blocks[b].startPc > this.cfg.blocks[a].startPc ? b : a,
+        )
+      : loop.backSrcs[0];
 
     if (enterAt !== header) {
       const et = this.t(enterAt);
@@ -202,7 +238,7 @@ export const loopPart: ThisType<Structurer> &
             implicitEnds: new Set(),
             breakables: [...wctx.breakables, brk],
           });
-          if (after >= 0) stmt.body.push({ kind: 'break' });
+          if (after >= 0 && !blockTerminates(stmt.body)) stmt.body.push({ kind: 'break' });
           stmts.push(stmt);
           return after;
         }
@@ -275,7 +311,34 @@ export const loopPart: ThisType<Structurer> &
           breakables: [...wctx.breakables, brk],
         };
         const selfLoop = condBlock === header;
-        const bodySet = new Set([...loopNodes].filter((x) => x !== condBlock || selfLoop));
+        // The do-while body is what the header reaches without first passing the
+        // condition or the block the condition jumps to on exit. Deriving it from
+        // loopNodes alone is not enough: that set can carry blocks laid out after the
+        // loop (the walk then nests the rest of the method inside the body).
+        const exitAfterCond = cT.jumpB === header ? cT.fallB : cT.jumpB;
+        const stop = new Set<number>([condBlock, ...loopExits]);
+        if (exitAfterCond >= 0) stop.add(exitAfterCond);
+        const bodySet = new Set<number>();
+        if (selfLoop) {
+          bodySet.add(header);
+        } else {
+          const pending = [header];
+          while (pending.length) {
+            const block = pending.pop()!;
+            if (block < 0 || bodySet.has(block) || stop.has(block) || !nodes.has(block)) continue;
+            bodySet.add(block);
+            for (const succ of this.cfg.blocks[block].succs) pending.push(succ);
+          }
+        }
+        // loopNodes can carry blocks laid out after the loop, which leaves exitSet empty
+        // and the loop without a break target. The condition's exit edge is the loop's
+        // real successor in that case.
+        if (exitAfterCond >= 0) {
+          loopExits.add(exitAfterCond);
+          brk.exits.add(exitAfterCond);
+          if (brk.naturalExit === undefined || brk.naturalExit < 0) brk.naturalExit = exitAfterCond;
+          if (after < 0) after = exitAfterCond;
+        }
         const body = selfLoop
           ? [...this.sim.stmts[header]]
           : this.walk(header, bodySet, new Set([...loopExits]), wctx2);
@@ -294,7 +357,7 @@ export const loopPart: ThisType<Structurer> &
         implicitEnds: new Set(),
         breakables: [...wctx.breakables, brk],
       });
-      if (after >= 0) stmt.body.push({ kind: 'break' });
+      if (after >= 0 && !blockTerminates(stmt.body)) stmt.body.push({ kind: 'break' });
       stmts.push(stmt);
       return after;
     }

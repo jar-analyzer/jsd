@@ -36,6 +36,7 @@ export interface StructureOperations {
     followPlus: Set<number>,
     laterCaseTargets: Set<number>,
     wctx: WalkCtx,
+    ownFollow?: number,
   ): Stmt[];
   tryStringSwitch(
     b: number,
