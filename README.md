@@ -18,7 +18,7 @@ A TypeScript Java `.class` decompiler for Node.js and browsers.
 - Keep files local, with no backend or uploads required.
 - Easily integrate into JavaScript tools.
 
-**Single JS file: approximately 292 KB, or 89 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
+**Single JS file: approximately 293 KB, or 90 KB with gzip.** No runtime dependencies, WebAssembly or Java installation required.
 
 Supports common control flow, lambdas, nested classes, records and selected Java features through Java 25. Intended as the decompilation engine for the next generation of **jar-analyzer**.
 
