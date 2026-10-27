@@ -1,8 +1,29 @@
 # CHANGELOG
 
+## 1.4.0
+
+release date: todo
+
+thanks:
+
+- @4ra1n
+
+changelog:
+
+- todo
+
+更新内容:
+
+- todo
+
 ## 1.3.1
 
-release date:
+release date: 2026.10.28
+
+thanks:
+
+- @4ra1n
+- @ssrsec
 
 changelog:
 
