@@ -66,32 +66,36 @@ function stmtAssignsSlot(s: Stmt, slot: number): boolean {
   return false;
 }
 
-/** Whether every path through this statement leaves the block it is in. */
-function stmtTerminates(s: Stmt): boolean {
+function stmtTerminates(s: Stmt, loopLabel?: string, inSwitch = false): boolean {
   switch (s.kind) {
     case 'break':
+      return s.label ? s.label === loopLabel : !inSwitch;
     case 'continue':
     case 'return':
     case 'throw':
       return true;
     case 'if':
-      return !!s.elseS && blockTerminates(s.thenS) && blockTerminates(s.elseS);
+      return (
+        !!s.elseS &&
+        blockTerminates(s.thenS, loopLabel, inSwitch) &&
+        blockTerminates(s.elseS, loopLabel, inSwitch)
+      );
     case 'label':
-      return stmtTerminates(s.inner);
+      return stmtTerminates(s.inner, loopLabel, inSwitch);
     case 'switch':
       return (
         s.cases.length > 0 &&
         s.cases.some((c) => c.hasDefault) &&
-        s.cases.every((c) => blockTerminates(c.body))
+        s.cases.every((c) => blockTerminates(c.body, loopLabel, true))
       );
     default:
       return false;
   }
 }
 
-function blockTerminates(body: Stmt[]): boolean {
+function blockTerminates(body: Stmt[], loopLabel?: string, inSwitch = false): boolean {
   const last = body[body.length - 1];
-  return last ? stmtTerminates(last) : false;
+  return last ? stmtTerminates(last, loopLabel, inSwitch) : false;
 }
 
 export const loopPart: ThisType<Structurer> &
@@ -188,9 +192,6 @@ export const loopPart: ThisType<Structurer> &
     const loopExits = new Set<number>([...exitSet, ...follow]);
 
     const headerTerm = this.t(header);
-    // The latch is the body block that ends the loop, not whichever back edge the CFG
-    // lists first: a switch arm that jumps back to the header is a continue, and taking
-    // it as the latch makes the structurer treat that continue as the implicit one.
     const bodyBackSrcs = loop.backSrcs.filter((u) => loopNodes.has(u));
     const backSrc = bodyBackSrcs.length
       ? bodyBackSrcs.reduce((a, b) =>
@@ -238,7 +239,8 @@ export const loopPart: ThisType<Structurer> &
             implicitEnds: new Set(),
             breakables: [...wctx.breakables, brk],
           });
-          if (after >= 0 && !blockTerminates(stmt.body)) stmt.body.push({ kind: 'break' });
+          if (after >= 0 && !blockTerminates(stmt.body, stmt.label))
+            stmt.body.push({ kind: 'break' });
           stmts.push(stmt);
           return after;
         }
@@ -298,7 +300,11 @@ export const loopPart: ThisType<Structurer> &
 
     const condBlock = backSrc;
     const condTerm = this.t(condBlock);
-    if (condTerm.t === 'if') {
+    if (
+      condTerm.t === 'if' &&
+      bodyBackSrcs.length > 0 &&
+      bodyBackSrcs.every((source) => source === condBlock)
+    ) {
       const cT = condTerm as { t: 'if'; cond: Expr; jumpB: number; fallB: number };
       const jumpsBack = cT.jumpB === header || cT.jumpB === backSrc;
       const fallsBack = cT.fallB === header;
@@ -311,10 +317,6 @@ export const loopPart: ThisType<Structurer> &
           breakables: [...wctx.breakables, brk],
         };
         const selfLoop = condBlock === header;
-        // The do-while body is what the header reaches without first passing the
-        // condition or the block the condition jumps to on exit. Deriving it from
-        // loopNodes alone is not enough: that set can carry blocks laid out after the
-        // loop (the walk then nests the rest of the method inside the body).
         const exitAfterCond = cT.jumpB === header ? cT.fallB : cT.jumpB;
         const stop = new Set<number>([condBlock, ...loopExits]);
         if (exitAfterCond >= 0) stop.add(exitAfterCond);
@@ -330,9 +332,6 @@ export const loopPart: ThisType<Structurer> &
             for (const succ of this.cfg.blocks[block].succs) pending.push(succ);
           }
         }
-        // loopNodes can carry blocks laid out after the loop, which leaves exitSet empty
-        // and the loop without a break target. The condition's exit edge is the loop's
-        // real successor in that case.
         if (exitAfterCond >= 0) {
           loopExits.add(exitAfterCond);
           brk.exits.add(exitAfterCond);
@@ -357,7 +356,7 @@ export const loopPart: ThisType<Structurer> &
         implicitEnds: new Set(),
         breakables: [...wctx.breakables, brk],
       });
-      if (after >= 0 && !blockTerminates(stmt.body)) stmt.body.push({ kind: 'break' });
+      if (after >= 0 && !blockTerminates(stmt.body, stmt.label)) stmt.body.push({ kind: 'break' });
       stmts.push(stmt);
       return after;
     }

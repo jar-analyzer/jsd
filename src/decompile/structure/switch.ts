@@ -26,12 +26,6 @@ function constValOf(ins: { op: number; imm?: number }): number {
   return ins.imm ?? 0;
 }
 
-/**
- * The nearest block two or more arms reach directly. Used when no post-dominator
- * survives: inside a loop the post-dominator of every block is the loop header, and a
- * follow there would swallow the arms that continue the loop instead of ending at the
- * code after the switch.
- */
 function commonArmSuccessor(
   state: Structurer,
   arms: number[],
@@ -284,18 +278,10 @@ export const switchPart: ThisType<Structurer> &
     if (this.claimed[target] || target === ownFollow) {
       return [];
     }
-    // An arm can leave the region instead of falling out of the switch: it may end in an
-    // enclosing loop continue target, in that loop's exit block, or in a block outside the
-    // region altogether. Those targets end the walk, but the arm still needs the continue,
-    // break or return that gets control there, so emit it instead of an empty body.
     const continueTarget = enclosingContinueTargets(wctx).has(target);
     if (followPlus.has(target) || continueTarget || !nodes.has(target)) {
       const out: Stmt[] = [];
-      try {
-        this.edgeToTarget(target, out, wctx);
-      } catch {
-        return [];
-      }
+      this.edgeToTarget(target, out, wctx);
       return out;
     }
     const stops = new Set<number>([...followPlus, ...laterCaseTargets]);

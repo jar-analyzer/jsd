@@ -25,10 +25,6 @@ export function pickFollow(
     ipd >= 0 &&
     ipd < state.cfg.blocks.length &&
     ipd !== b &&
-    // Inside a loop an arm entry is never the merge point: when a case block is also the
-    // switch's post-dominator, taking it as the follow emits that arm as an empty label
-    // and moves its body after the switch. Outside a loop the shared block is how a
-    // break that lands on another arm is represented, so it stays allowed there.
     (!((avoid?.size ?? 0) > 0) || !arms.includes(ipd)) &&
     !follow.has(ipd) &&
     !blocked(ipd) &&

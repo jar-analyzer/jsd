@@ -6,10 +6,12 @@ release date:
 
 changelog:
 
+- Preserve loop exits when switch arms use break statements.
 - Preserve catch field and array assignments when removing duplicated finally code.
 
 更新内容:
 
+- 保留 switch 分支使用 break 时的循环退出行为。
 - 去除重复 finally 代码时保留 catch 中的字段和数组赋值。
 
 ## 1.3.0
