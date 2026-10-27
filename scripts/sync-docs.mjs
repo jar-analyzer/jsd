@@ -3,9 +3,15 @@ import { syncDocs } from './doc-artifacts.mjs';
 
 try {
   const args = process.argv.slice(2);
-  if (args.length > 1 || args.some((arg) => arg !== '--check'))
-    throw new Error('Usage: node scripts/sync-docs.mjs [--check]');
-  const sizes = syncDocs(fileURLToPath(new URL('../', import.meta.url)), args.includes('--check'));
+  const check = args.includes('--check');
+  const ignoreGzip = args.includes('--ignore-gzip');
+  if (
+    args.length > 2 ||
+    args.some((arg) => arg !== '--check' && arg !== '--ignore-gzip') ||
+    (ignoreGzip && !check)
+  )
+    throw new Error('Usage: node scripts/sync-docs.mjs [--check [--ignore-gzip]]');
+  const sizes = syncDocs(fileURLToPath(new URL('../', import.meta.url)), check, ignoreGzip);
   console.log(
     `Bundle: ${sizes.bytes} bytes; gzip: ${sizes.gzipBytes} bytes; documentation: ${sizes.kb} KB / ${sizes.gzipKb} KB.`,
   );

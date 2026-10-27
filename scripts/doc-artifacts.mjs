@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-export function syncDocs(root, check = false) {
+export function syncDocs(root, check = false, ignoreGzip = false) {
   const bundle = readFileSync(join(root, 'dist/jsd.min.js'));
   const bytes = bundle.length;
   const gzipBytes = gzipSync(bundle, { level: 9 }).length;
@@ -48,9 +48,24 @@ export function syncDocs(root, check = false) {
   }
   html = replaceOne(html, /JS ~\d+ KB · gzip ~\d+ KB/, `JS ~${kb} KB · gzip ~${gzipKb} KB`, demo);
   updates.set(demo, Buffer.from(html));
-  const stale = [...updates].filter(
-    ([path, value]) => !readFileSync(join(root, path)).equals(value),
-  );
+  const ignoreGzipSizes = (path, source) => {
+    if (path === 'README.md') return source.replace(/(or )\d+( KB with gzip\.)/, '$1<GZIP>$2');
+    if (path === 'README.zh-CN.md') return source.replace(/(gzip 后约 )\d+( KB。)/, '$1<GZIP>$2');
+    if (path === demo) {
+      return source
+        .replace(
+          /(data-i18n="gzipLabel">[^<]+<\/span>\s*<strong>~)\d+( <small>KB<\/small><\/strong>\s*<small>)\d+\.\d+( MB<\/small>)/,
+          '$1<GZIP_KB>$2<GZIP_MB>$3',
+        )
+        .replace(/(gzip ~)\d+( KB)/, '$1<GZIP>$2');
+    }
+    return source;
+  };
+  const stale = [...updates].filter(([path, value]) => {
+    const current = readFileSync(join(root, path));
+    if (!ignoreGzip || path === 'docs/jsd.browser.js') return !current.equals(value);
+    return ignoreGzipSizes(path, current.toString()) !== ignoreGzipSizes(path, value.toString());
+  });
   if (check && stale.length)
     throw new Error(
       `Outdated documentation or demo bundle: ${stale.map(([path]) => path).join(', ')}. Run npm run sync.`,

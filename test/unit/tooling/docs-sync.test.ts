@@ -72,6 +72,36 @@ test('documentation CI check rejects stale files without rewriting them', () => 
   });
 });
 
+test('documentation CI check can ignore gzip sizes while checking bundle and other displays', () => {
+  fixture((root) => {
+    syncDocs(root);
+    const readme = join(root, 'README.md');
+    const chineseReadme = join(root, 'README.zh-CN.md');
+    const demo = join(root, 'docs/index.html');
+    writeFileSync(
+      readme,
+      readFileSync(readme, 'utf8').replace(/or \d+ KB with gzip/, 'or 999 KB with gzip'),
+    );
+    writeFileSync(
+      chineseReadme,
+      readFileSync(chineseReadme, 'utf8').replace(/gzip 后约 \d+ KB/, 'gzip 后约 999 KB'),
+    );
+    writeFileSync(
+      demo,
+      readFileSync(demo, 'utf8')
+        .replace(/(gzipLabel">[^<]+<\/span>\s*<strong>~)\d+/, (_, prefix) => `${prefix}999`)
+        .replace(/(With gzip[\s\S]*?<small>)\d+\.\d+/, (_, prefix) => `${prefix}999.999`)
+        .replace(/gzip ~\d+ KB/, 'gzip ~999 KB'),
+    );
+    assert.doesNotThrow(() => syncDocs(root, true, true));
+    writeFileSync(
+      readme,
+      readFileSync(readme, 'utf8').replace(/approximately \d+ KB/, 'approximately 999 KB'),
+    );
+    assert.throws(() => syncDocs(root, true, true), /README\.md/);
+  });
+});
+
 test('documentation sync refuses to partially update missing or duplicated size displays', () => {
   fixture((root) => {
     const file = join(root, 'README.md');
